@@ -2,6 +2,7 @@
 #include "FreeRTOS.h"
 #include "semphr.h"
 #include <Adafruit_NeoPixel.h>
+#include <Arduino.h>
 
 #define NeoPixel_PIN  48 //
 #define NUMPIXELS  1 // Popular NeoPixel ring size
@@ -10,22 +11,19 @@ Adafruit_NeoPixel pixels(NUMPIXELS, NeoPixel_PIN, NEO_GRB + NEO_KHZ800);
 
 TeamSelect team_sel = TeamSelect::RED;
 volatile bool team_change_triggered = false;
-//volatile bool team_sel_read = false;
 SemaphoreHandle_t team_sem = nullptr;
 
 TaskHandle_t TeamStatusTaskHandle = NULL;
 
 void ARDUINO_ISR_ATTR onGPIO21Interrupt() {
-  BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
-  if (digitalRead(TEAM_SELECT_INPUT_PIN) == HIGH) {
-      team_change_triggered = true;
-  }
-  
-  //gpio21_level = digitalRead(TEAM_SELECT_INPUT_PIN);
-
-  xSemaphoreGiveFromISR(team_sem, &xHigherPriorityTaskWoken);
-  portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+    if (digitalRead(TEAM_SELECT_INPUT_PIN) == HIGH) {
+        team_change_triggered = true;
+        xSemaphoreGiveFromISR(team_sem, &xHigherPriorityTaskWoken);
+    }
+    
+    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
 
@@ -42,15 +40,18 @@ void InitTeamStatusTask() {
         }
     }
 
+    // init team select input (SW) pin
     pinMode(TEAM_SELECT_INPUT_PIN, INPUT_PULLUP);
     attachInterrupt(digitalPinToInterrupt(TEAM_SELECT_INPUT_PIN), onGPIO21Interrupt, RISING);
 
     pixels.clear();
-    pixels.setPixelColor(0, pixels.Color(150, 150, 150));
-    pixels.show(); 
-
-    pixels.clear();
-    pixels.setPixelColor(0, pixels.Color(0, 150, 150));
+    if (team_sel == TeamSelect::RED) {
+        pixels.setPixelColor(0, pixels.Color(150, 0, 0));
+    } else if (team_sel == TeamSelect::BLUE) {
+        pixels.setPixelColor(0, pixels.Color(0, 0, 150));
+    } else {
+        pixels.setPixelColor(0, pixels.Color(0, 0, 0));
+    }
     pixels.show(); 
 
     xTaskCreatePinnedToCore(

@@ -1,4 +1,5 @@
 #include "team_status.h"
+#include "game_status.h"
 
 //#define IR_ADC_PIN 7
 
@@ -56,10 +57,8 @@ void setup() {
   //   1                  // Core 1
   // );
 
-  InitTeamStatusTask();
-
-
-  pinMode(39, INPUT_PULLUP);
+  InitTeamStatusTask(); // RED, BLUE team selection and RGB LED indicator
+  InitGameStatusTask(); // game status: idle, start. green LED indicator
 
   // xTaskCreatePinnedToCore(
   //   IRBeaconTask,         // Task function
