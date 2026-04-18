@@ -6,4 +6,3 @@ enum class TeamSelect {
 };
 
 void InitTeamStatusTask();
-void TeamStatusTask(void *parameter);

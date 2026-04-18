@@ -7,6 +7,9 @@
 #define NeoPixel_PIN  48 //
 #define NUMPIXELS  1 // Popular NeoPixel ring size
 
+// declare
+void TeamStatusTask(void *parameter);
+
 Adafruit_NeoPixel pixels(NUMPIXELS, NeoPixel_PIN, NEO_GRB + NEO_KHZ800);
 
 TeamSelect team_sel = TeamSelect::RED;

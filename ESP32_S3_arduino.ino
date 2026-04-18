@@ -1,5 +1,6 @@
 #include "team_status.h"
 #include "game_status.h"
+#include "line_follower.h"
 
 //#define IR_ADC_PIN 7
 
@@ -57,18 +58,9 @@ void setup() {
   //   1                  // Core 1
   // );
 
+  InitLineFollowerTask();
   InitTeamStatusTask(); // RED, BLUE team selection and RGB LED indicator
   InitGameStatusTask(); // game status: idle, start. green LED indicator
-
-  // xTaskCreatePinnedToCore(
-  //   IRBeaconTask,         // Task function
-  //   "IRBeaconTask",       // Task name
-  //   10000,             // Stack size (bytes)
-  //   NULL,              // Parameters
-  //   1,                 // Priority
-  //   &IRBeaconTaskHandle,  // Task handle
-  //   1                  // Core 1
-  // );
 
 }
 

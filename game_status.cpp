@@ -3,6 +3,9 @@
 #include "semphr.h"
 #include <Arduino.h>
 
+// declare
+void GameStatusTask(void *parameter);
+
 bool game_started = false;
 SemaphoreHandle_t start_btn_sem = nullptr;
 SemaphoreHandle_t game_timeout_sem = nullptr;
@@ -56,6 +59,9 @@ void InitGameStatusTask() {
     // init LED status output pin
     pinMode(GAME_STARTED_LED_PIN, OUTPUT);
     digitalWrite(GAME_STARTED_LED_PIN, LOW);
+
+    pinMode(FIRING_LED_PIN, OUTPUT);
+    digitalWrite(FIRING_LED_PIN, HIGH);
 
     // init timer for game count down
     gameTimer = timerBegin(1000000); // API v3.0, (freq: 1Mhz -> 1us)
