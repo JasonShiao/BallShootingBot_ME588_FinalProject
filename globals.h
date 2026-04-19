@@ -5,6 +5,7 @@
 #include "queue.h"
 #include <stdint.h>
 #include "config.h"
+#include <Arduino.h>
 
 enum class TaskId {
   GameStatus = 0,
@@ -30,13 +31,18 @@ extern QueueHandle_t g_fsmEventQueue;    // other -> fsm task
 enum class RobotState {
     Idle,
     Started,
-    LaunchingBall
+    LaunchingBall,
+    ForceStopped,
+    Error
 };
 
 enum class RobotTeam {
   Blue,
   Red
 };
+
+const char* stateToString(RobotState s);
+bool stringToState(const String& str, RobotState& out);
 // -----------------------
 
 /* ---------- Event (request) sent from other to FSM task ------------- */

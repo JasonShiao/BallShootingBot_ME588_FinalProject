@@ -1,12 +1,51 @@
 #include "user_interface.h"
-#include "Arduino.h"
+#include <Arduino.h>
 #include "FreeRTOS.h"
 #include "globals.h"
+#include <WiFi.h>
+#include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h>
+
+#include "web_server_page.h"
 
 void userIntefaceTask(void *parameter);
 TaskHandle_t userInterfaceTaskHandle = NULL;
 
+// ============================
+// Shared app state
+// ============================
+struct TransitionRecord {
+    uint32_t timestampMs;
+    RobotState from;
+    RobotState to;
+    //String reason;
+};
+
+static constexpr size_t LOG_CAPACITY = 200;
+
+struct AppState {
+    RobotState currentState = RobotState::Idle;
+
+    TransitionRecord log[LOG_CAPACITY];
+    size_t logHead = 0;   // index of oldest entry
+    size_t logCount = 0;  // number of valid entries
+};
+AppState appState;
+
+size_t getLogPhysicalIndex(size_t logicalIndex);
+void pushLogRecord(const TransitionRecord& rec);
+static void appendTransition(RobotState from, RobotState to, const char* reason);
+
+void connectWiFi();
+void setupWebServer();
+static size_t appendJsonEscaped(char* dst, size_t dstSize, size_t offset, const char* src);
+static void formatLogEntry(const TransitionRecord& rec, char* out, size_t outSize);
+
 void initUserInterface() {
+    
+    connectWiFi();
+    setupWebServer();
+
     xTaskCreatePinnedToCore(
         userIntefaceTask,      // Task function
         "UserIntefaceTask",    // Task name
@@ -20,7 +59,28 @@ void initUserInterface() {
 
 void userIntefaceTask(void *parameter) {
     char rcvdChar;
+    FsmNotifQueueItem notif_item;
+
     for (;;) {
+        // Receive status update from FSM, update web server
+        if (xQueueReceive(
+                g_fsmNotifQueue[toIndex(TaskId::UserInterface)], 
+                &notif_item, 
+                0) == pdPASS) {
+
+            DEBUG_LEVEL_2("notif from fsm rcvd by UserInterface");
+
+            switch (notif_item.type) {
+                case FsmNotifType::StateChanged:
+                    if (appState.currentState != notif_item.data.state) {
+                        appendTransition(appState.currentState, notif_item.data.state, "");
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+        // Receive req from serial port
         if (Serial.available() > 0) {
             rcvdChar = Serial.read();
             if (rcvdChar == 'b') {
@@ -29,11 +89,228 @@ void userIntefaceTask(void *parameter) {
                 ev.type = FsmEventType::UserStateChangeReq;
                 ev.data.newState = RobotState::LaunchingBall;
                 BaseType_t ok = xQueueSend(g_fsmEventQueue, &ev, 0);
+            } else if (rcvdChar == 'w') {
+                Serial.println(WiFi.localIP());
             } else if (rcvdChar != '\n') {
               DEBUG_LEVEL_1("Rcvd: %c", rcvdChar);
             }
         }
 
-        vTaskDelay(pdMS_TO_TICKS(10));
+        vTaskDelay(pdMS_TO_TICKS(20));
     }
+}
+
+// ============================
+// Wi-Fi
+// ============================
+void connectWiFi() {
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(WIFI_SSID, WIFI_PSWD);
+
+    Serial.print("Connecting to Wi-Fi");
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
+    }
+    Serial.println();
+
+    Serial.print("WiFi Connected");
+    //Serial.print("Connected, IP address: ");
+    //Serial.println(WiFi.localIP());
+}
+
+// ============================
+// Web server
+// ============================
+AsyncWebServer server(80);
+AsyncEventSource events("/events");
+
+// setup APIs handler
+void setupWebServer() {
+    server.on("/", HTTP_GET, [](AsyncWebServerRequest* request) {
+        request->send_P(200, "text/html", INDEX_HTML);
+    });
+
+    server.on("/state", HTTP_GET, [](AsyncWebServerRequest* request) {
+        static constexpr size_t JSON_BUF_SIZE = 8192;
+        char json[JSON_BUF_SIZE];
+        char logLine[128];
+
+        size_t off = 0;
+
+        off += snprintf(
+            json + off,
+            JSON_BUF_SIZE - off,
+            "{\"currentState\":\"%s\",\"log\":[",
+            stateToString(appState.currentState)
+        );
+
+        for (size_t i = 0; i < appState.logCount && off < JSON_BUF_SIZE; ++i) {
+            const TransitionRecord& rec = appState.log[getLogPhysicalIndex(i)];
+            formatLogEntry(rec, logLine, sizeof(logLine));
+
+            if (i > 0 && off + 1 < JSON_BUF_SIZE) {
+                json[off++] = ',';
+                json[off] = '\0';
+            }
+
+            if (off + 1 < JSON_BUF_SIZE) {
+                json[off++] = '"';
+                json[off] = '\0';
+            }
+
+            off = appendJsonEscaped(json, JSON_BUF_SIZE, off, logLine);
+
+            if (off + 1 < JSON_BUF_SIZE) {
+                json[off++] = '"';
+                json[off] = '\0';
+            }
+        }
+
+        if (off + 3 < JSON_BUF_SIZE) {
+            json[off++] = ']';
+            json[off++] = '}';
+            json[off] = '\0';
+        } else {
+            request->send(500, "text/plain", "Response buffer too small");
+            return;
+        }
+
+        request->send(200, "application/json", json);
+    });
+
+    server.on("/setState", HTTP_POST, [](AsyncWebServerRequest* request) {
+        if (!request->hasParam("state", true)) {
+            request->send(400, "text/plain", "Missing state parameter");
+            return;
+        }
+
+        String stateStr = request->getParam("state", true)->value();
+        RobotState newState;
+
+        DEBUG_LEVEL_1("Server rcvd new state: %s", stateStr);
+
+        if (!stringToState(stateStr, newState)) {
+            request->send(400, "text/plain", "Invalid state");
+            return;
+        }
+
+        // Send state change req to FSM task
+        FsmEventQueueItem ev{};
+        ev.type = FsmEventType::UserStateChangeReq;
+        ev.data.newState = newState;
+        BaseType_t ok = xQueueSend(g_fsmEventQueue, &ev, 0);
+        if (ok == pdPASS) {
+            request->send(200, "text/plain", "State command accepted");
+        } else {
+            request->send(500, "text/plain", "Command queue full");
+        }
+    });
+
+    events.onConnect([](AsyncEventSourceClient* client) {
+        client->send("connected", "hello", millis());
+
+        RobotState currentState = RobotState::Idle;
+        currentState = appState.currentState;
+        
+        client->send(stateToString(currentState), "state", millis());
+    });
+
+    server.addHandler(&events);
+    server.begin();
+}
+
+
+// ============================
+// Helpers
+// ============================
+static size_t appendJsonEscaped(char* dst, size_t dstSize, size_t offset, const char* src) {
+    if (!dst || dstSize == 0 || !src) return offset;
+
+    while (*src && offset + 1 < dstSize) {
+        char c = *src++;
+        if (c == '\\' || c == '"') {
+            if (offset + 2 >= dstSize) break;
+            dst[offset++] = '\\';
+            dst[offset++] = c;
+        } else if (c == '\n') {
+            if (offset + 2 >= dstSize) break;
+            dst[offset++] = '\\';
+            dst[offset++] = 'n';
+        } else if (c == '\r') {
+            if (offset + 2 >= dstSize) break;
+            dst[offset++] = '\\';
+            dst[offset++] = 'r';
+        } else if (c == '\t') {
+            if (offset + 2 >= dstSize) break;
+            dst[offset++] = '\\';
+            dst[offset++] = 't';
+        } else {
+            dst[offset++] = c;
+        }
+    }
+
+    if (offset < dstSize) {
+        dst[offset] = '\0';
+    } else {
+        dst[dstSize - 1] = '\0';
+    }
+
+    return offset;
+}
+
+static void formatLogEntry(const TransitionRecord& rec, char* out, size_t outSize) {
+    if (out == nullptr || outSize == 0) return;
+
+    snprintf(
+        out,
+        outSize,
+        "[%lu ms] %s -> %s",
+        static_cast<unsigned long>(rec.timestampMs),
+        stateToString(rec.from),
+        stateToString(rec.to)
+    );
+}
+
+void pushStateUpdateToClients(RobotState state) {
+    char msg[32];
+    snprintf(msg, sizeof(msg), "%s", stateToString(state));
+    events.send(msg, "state", millis());
+}
+
+void pushLogUpdateToClients(const TransitionRecord& rec) {
+    char msg[128];
+    formatLogEntry(rec, msg, sizeof(msg));
+    events.send(msg, "log", millis());
+}
+
+size_t getLogPhysicalIndex(size_t logicalIndex) {
+    return (appState.logHead + logicalIndex) % LOG_CAPACITY;
+}
+
+void pushLogRecord(const TransitionRecord& rec) {
+    if (appState.logCount < LOG_CAPACITY) {
+        size_t tail = (appState.logHead + appState.logCount) % LOG_CAPACITY;
+        appState.log[tail] = rec;
+        appState.logCount++;
+    } else {
+        // overwrite oldest
+        appState.log[appState.logHead] = rec;
+        appState.logHead = (appState.logHead + 1) % LOG_CAPACITY;
+    }
+}
+
+static void appendTransition(RobotState from, RobotState to, const char* reason) {
+    (void)reason;
+
+    TransitionRecord rec{};
+    rec.timestampMs = millis();
+    rec.from = from;
+    rec.to = to;
+
+    appState.currentState = to;
+    pushLogRecord(rec);
+
+    pushStateUpdateToClients(to);
+    pushLogUpdateToClients(rec);
 }

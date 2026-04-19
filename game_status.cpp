@@ -23,7 +23,7 @@ void ARDUINO_ISR_ATTR onGameStartBtnInterrupt() {
     if ((now - lastStartIsr_us) > 50000) {  // 50 ms debounce
         lastStartIsr_us = now;
 
-        if (!gameStarted) {
+        if ((!gameStarted)) {
             FsmEventQueueItem ev{};
             ev.type = FsmEventType::GameStartReq;
             ev.data.startPressed = true;
@@ -96,7 +96,7 @@ void gameStatusTask(void *parameter) {
 
             switch (notif_item.type) {
                 case FsmNotifType::StateChanged:
-                    if (!gameStarted && (notif_item.data.state != RobotState::Idle)) {
+                    if (!gameStarted && (notif_item.data.state != RobotState::Idle)) { // idle -> active
                         gameStarted = true;
                         digitalWrite(GAME_STARTED_LED_PIN, HIGH);
                         // reset and start timer
@@ -104,7 +104,7 @@ void gameStatusTask(void *parameter) {
                         timerStart(gameTimer);
 
                         DEBUG_LEVEL_1("Game started.");
-                    } else if (gameStarted && (notif_item.data.state == RobotState::Idle)) {
+                    } else if (gameStarted && (notif_item.data.state == RobotState::Idle)) { // active -> idle
                         gameStarted = false;
                         digitalWrite(GAME_STARTED_LED_PIN, LOW);
                         // stop timer in case

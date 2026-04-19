@@ -24,3 +24,38 @@ void initQueues() {
         }
     }
 }
+
+const char* stateToString(RobotState s) {
+    switch (s) {
+        case RobotState::Idle:           return "Idle";
+        case RobotState::Started:          return "Started";
+        case RobotState::LaunchingBall:        return "LaunchingBall";
+        case RobotState::ForceStopped:    return "ForceStopped";
+        case RobotState::Error: return "Error";
+        default:                         return "Unknown";
+    }
+}
+
+bool stringToState(const String& str, RobotState& out) {
+    if (str == "Idle") {
+        out = RobotState::Idle;
+        return true;
+    }
+    if (str == "Started") {
+        out = RobotState::Started;
+        return true;
+    }
+    if (str == "LaunchingBall") {
+        out = RobotState::LaunchingBall;
+        return true;
+    }
+    if (str == "ForceStopped") {
+        out = RobotState::ForceStopped;
+        return true;
+    }
+    if (str == "Error") {
+        out = RobotState::Error;
+        return true;
+    }
+    return false;
+}
