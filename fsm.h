@@ -1,14 +1,23 @@
+#ifndef FSM_H
+#define FSM_H
 
-enum class RobotState {
-    IDLE,
-    STARTED;
-};
+#include "globals.h"
+
+#define MAX_NOTIF_QUEUE_NUM 10
+
 
 class RobotFSM {
   public:
     RobotState get_state();
+    void set_state(RobotState);
+    RobotTeam get_team();
+    void toggle_team();
   private:
     RobotState _state = RobotState::IDLE;
-}
+    RobotTeam _team = RobotTeam::RED;
+};
 
-extern RobotFSM fsm;
+void InitFsmTask();
+
+
+#endif

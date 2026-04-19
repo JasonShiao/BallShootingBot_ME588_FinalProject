@@ -1,30 +1,35 @@
 #include "game_status.h"
 #include "FreeRTOS.h"
-#include "semphr.h"
+#include "queue.h"
 #include <Arduino.h>
+#include "globals.h"
 
 // declare
 void GameStatusTask(void *parameter);
-
-bool game_started = false;
-SemaphoreHandle_t start_btn_sem = nullptr;
-SemaphoreHandle_t game_timeout_sem = nullptr;
-
-volatile bool start_btn_triggered = false;
-volatile bool game_timeout_triggered = false;
 
 TaskHandle_t GameStatusTaskHandle = NULL;
 
 hw_timer_t* gameTimer = nullptr;
 static const uint32_t GAME_DURATION_MS = 20000; // 150000// 2min30s = 150s
 
-void ARDUINO_ISR_ATTR onGPIO39Interrupt() {
+static volatile uint32_t last_start_isr_us = 0; // for debounce
+volatile bool game_started = false;
+//static volatile RobotState curr_state = RobotState::IDLE; 
+
+
+void ARDUINO_ISR_ATTR onGameStartBtnInterrupt() {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
-    if (!game_started) {
-        if (digitalRead(GAME_START_INPUT_PIN) == LOW) {
-            start_btn_triggered = true;
-            xSemaphoreGiveFromISR(start_btn_sem, &xHigherPriorityTaskWoken);
+    uint32_t now = micros();
+
+    if ((now - last_start_isr_us) > 50000) {  // 50 ms debounce
+        last_start_isr_us = now;
+
+        if (!game_started) {
+            FsmEventQueueItem ev{};
+            ev.type = FsmEventType::GameStartReq;
+            ev.data.startPressed = true;
+            BaseType_t ok = xQueueSendFromISR(g_FsmEventQueue, &ev, &xHigherPriorityTaskWoken);
         }
     }
     
@@ -34,37 +39,35 @@ void ARDUINO_ISR_ATTR onGPIO39Interrupt() {
 void ARDUINO_ISR_ATTR onGameTimeoutInterrupt() {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
-    game_timeout_triggered = true;
-    xSemaphoreGiveFromISR(game_timeout_sem, &xHigherPriorityTaskWoken);
+    if (game_started) {
+        FsmEventQueueItem ev{};
+        ev.type = FsmEventType::GameTimeoutReq;
+        ev.data.startPressed = false;
+        BaseType_t ok = xQueueSendFromISR(g_FsmEventQueue, &ev, &xHigherPriorityTaskWoken);
+    }
 
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
 
 void InitGameStatusTask() {
-    // create semaphores first
-    start_btn_sem = xSemaphoreCreateBinary();
-    game_timeout_sem = xSemaphoreCreateBinary();
-    if (start_btn_sem == nullptr || game_timeout_sem == nullptr) {
-        Serial.println("Failed to create semaphore.");
-        while (true) {
-            delay(1000);
-        }
-    }
 
     // init game start button input
     pinMode(GAME_START_INPUT_PIN, INPUT_PULLUP);
-    attachInterrupt(digitalPinToInterrupt(GAME_START_INPUT_PIN), onGPIO39Interrupt, FALLING);
+    attachInterrupt(digitalPinToInterrupt(GAME_START_INPUT_PIN), onGameStartBtnInterrupt, FALLING);
 
     // init LED status output pin
     pinMode(GAME_STARTED_LED_PIN, OUTPUT);
     digitalWrite(GAME_STARTED_LED_PIN, LOW);
 
+#ifdef TEST_BALL_LAUNCH_DISPLAY
+    // for preliminary test only here, should be controlled by ball launcher task
     pinMode(FIRING_LED_PIN, OUTPUT);
     digitalWrite(FIRING_LED_PIN, HIGH);
+#endif
 
     // init timer for game count down
-    gameTimer = timerBegin(1000000); // API v3.0, (freq: 1Mhz -> 1us)
+    gameTimer = timerBegin(1000000); // API v3.0, (freq: 1Mhz -> 1us per counter tick)
     if (gameTimer == nullptr) {
         Serial.println("Failed to create timer.");
         while (true) {
@@ -89,43 +92,38 @@ void InitGameStatusTask() {
 
 
 void GameStatusTask(void *parameter) {
+    FsmNotifQueueItem notif_item;
+
     for(;;) {
-        if (!game_started) { // idle -> start
-            xSemaphoreTake(start_btn_sem, portMAX_DELAY); // block here until semaphore is given
-            // debounce
-            vTaskDelay(30 / portTICK_PERIOD_MS);
+        if (xQueueReceive(
+                g_FsmNotifQueue[ToIndex(TaskId::GameStatus)], 
+                &notif_item, 
+                portMAX_DELAY) == pdPASS) {
 
-            if (start_btn_triggered) {
-                game_started = true;
-                digitalWrite(GAME_STARTED_LED_PIN, HIGH);
-                Serial.println("Game started.");
+            Serial.println("notif from fsm rcvd by GameStatus");
 
-                // reset and start timer
-                timerRestart(gameTimer);
-                timerStart(gameTimer);
+            switch (notif_item.type) {
+                case FsmNotifType::StateChanged:
+                    if (!game_started && (notif_item.data.state != RobotState::IDLE)) {
+                        game_started = true;
+                        digitalWrite(GAME_STARTED_LED_PIN, HIGH);
+                        // reset and start timer
+                        timerRestart(gameTimer);
+                        timerStart(gameTimer);
 
-                // reset btn trigger flag
-                start_btn_triggered = false;
+                        Serial.println("Game started.");
+                    } else if(game_started && (notif_item.data.state == RobotState::IDLE)) {
+                        game_started = false;
+                        digitalWrite(GAME_STARTED_LED_PIN, LOW);
+                        // stop timer in case
+                        timerStop(gameTimer);
+
+                        Serial.println("Game stopped / returned to IDLE.");
+                    }
+                    break;
+                default:
+                    break;
             }
-
-        } else { // wait for game count down finish
-            xSemaphoreTake(game_timeout_sem, portMAX_DELAY); // block here until semaphore is given
-            // debounce
-            vTaskDelay(30 / portTICK_PERIOD_MS);
-
-            if (game_timeout_triggered) {
-                game_started = false;
-                digitalWrite(GAME_STARTED_LED_PIN, LOW);
-                Serial.println("Game timeout.");
-
-                // stop timer in case
-                timerStop(gameTimer);
-
-                // reset timeout flag
-                game_timeout_triggered = false;
-            }
-
         }
-
     }
 }
