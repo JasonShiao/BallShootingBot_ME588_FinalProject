@@ -17,10 +17,10 @@ volatile bool isLaunchingBall = false;
 
 int servoAngleToMicroseconds(int angle) {
     if (angle < 0) angle = 0;
-    if (angle > 270) angle = 270;
+    if (angle > SERVO_MAX_ANGLE) angle = SERVO_MAX_ANGLE;
 
     // map from 0-270 to 500-2500
-    int micros = 500 + (angle - 0) * 2000 / 270;
+    int micros = 500 + (angle - 0) * 2000 / SERVO_MAX_ANGLE;
     return micros;
 }
 
@@ -114,8 +114,12 @@ void ballLauncherTask(void *parameter) {
                             DEBUG_LEVEL_1("Bucket empty. Not launching ball.");
                         } else {
                             // 3. shoot
-                            //ballShootServo.writeMicroseconds(servoAngleToMicroseconds(...));
-                            //ballShootServo.writeMicroseconds(servoAngleToMicroseconds(...));
+                            ballShootServo.writeMicroseconds(servoAngleToMicroseconds(0));
+                            vTaskDelay(pdMS_TO_TICKS(800));
+                            ballShootServo.writeMicroseconds(servoAngleToMicroseconds(SERVO_MAX_ANGLE));
+                            vTaskDelay(pdMS_TO_TICKS(800));
+                            ballShootServo.writeMicroseconds(servoAngleToMicroseconds(0));
+                            vTaskDelay(pdMS_TO_TICKS(500));
 
                             // reset and start timer
                             timerRestart(ballLaunchTimer);
