@@ -36,6 +36,22 @@ void InitFsmTask() {
     );
 }
 
+inline FsmNotifQueueItem makeStateChangedNotif(RobotState state, RobotTeam team) {
+    FsmNotifQueueItem n{};
+    n.type = FsmNotifType::StateChanged;
+    n.data.state = state;
+    n.data.team = team;
+    return n;
+}
+
+inline FsmNotifQueueItem makeTeamChangedNotif(RobotState state, RobotTeam team) {
+    FsmNotifQueueItem n{};
+    n.type = FsmNotifType::TeamChanged;
+    n.data.state = state;
+    n.data.team = team;
+    return n;
+}
+
 void broadcastNotif(FsmNotifQueueItem notif) {
     for (int i = 0; i < NUM_TASK; i++) {
          BaseType_t ok = xQueueSend(g_FsmNotifQueue[i], &notif, 0); // expect return: pdPASS
@@ -51,33 +67,32 @@ void FsmTask(void *parameter) {
                 &ev, 
                 portMAX_DELAY) == pdPASS) {
             
-            Serial.println("FSM task rcvd a new event");
+            DEBUG_LEVEL_1("FSM task rcvd a new event");
             switch (ev.type) {
                 case FsmEventType::GameStartReq:
-                    Serial.println("Game start req");
+                    DEBUG_LEVEL_1("Game start req");
                     // TODO:
                     if (fsm.get_state() == RobotState::IDLE) {
                         fsm.set_state(RobotState::STARTED);
-                        FsmNotifQueueItem notif{};
-                        notif.type = FsmNotifType::StateChanged;
-                        notif.data.state = fsm.get_state();
-                        notif.data.team = fsm.get_team();
+                        auto notif = makeStateChangedNotif(fsm.get_state(), fsm.get_team());
                         broadcastNotif(notif);
                     }
                     break;
                 case FsmEventType::GameTimeoutReq:
-                    Serial.println("Game timeout req");
+                    DEBUG_LEVEL_1("Game timeout req");
                     // TODO:
+                    if (fsm.get_state() == RobotState::STARTED) {
+                        fsm.set_state(RobotState::IDLE);
+                        auto notif = makeStateChangedNotif(fsm.get_state(), fsm.get_team());
+                        broadcastNotif(notif);
+                    }
                     break;
                 case FsmEventType::TeamChangeReq:
-                    Serial.println("Team change req");
+                    DEBUG_LEVEL_1("Team change req");
                     // TODO:
                     if (fsm.get_state() == RobotState::IDLE) {
                         fsm.toggle_team();
-                        FsmNotifQueueItem notif{};
-                        notif.type = FsmNotifType::TeamChanged;
-                        notif.data.state = fsm.get_state();
-                        notif.data.team = fsm.get_team();
+                        auto notif = makeTeamChangedNotif(fsm.get_state(), fsm.get_team());
                         broadcastNotif(notif);
                     }
                     break;

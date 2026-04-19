@@ -4,6 +4,7 @@
 #include "FreeRTOS.h"
 #include "queue.h"
 #include <stdint.h>
+#include "config.h"
 
 enum class TaskId {
   GameStatus = 0,

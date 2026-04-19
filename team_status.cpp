@@ -83,7 +83,7 @@ void TeamStatusTask(void *parameter) {
                 &notif_item, 
                 portMAX_DELAY) == pdPASS) {
         
-            Serial.println("notif from fsm rcvd by TeamStatus");
+            DEBUG_LEVEL_1("notif from fsm rcvd by TeamStatus");
 
             switch (notif_item.type) {
                 case FsmNotifType::TeamChanged:
@@ -91,12 +91,14 @@ void TeamStatusTask(void *parameter) {
                         pixels.clear();
                         pixels.setPixelColor(0, pixels.Color(150, 0, 0));
                         pixels.show();   // Send the updated pixel colors to the hardware.
-                        Serial.println("Team RED");
+                        
+                        DEBUG_LEVEL_1("Team RED");
                     } else {
                         pixels.clear();
                         pixels.setPixelColor(0, pixels.Color(0, 0, 150));
                         pixels.show();   // Send the updated pixel colors to the hardware.
-                        Serial.println("Team BLUE");
+
+                        DEBUG_LEVEL_1("Team BLUE");
                     }
                     curr_team = notif_item.data.team;
                     break;

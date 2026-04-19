@@ -17,12 +17,12 @@ void initQueues() {
         /* One or more queues were not created successfully as there was not enough
            heap memory available. Handle the error here. Queues can also be created
            statically. */
-        Serial.println("Fsm Event queue created failed");
+        DEBUG_LEVEL_1("Fsm Event queue created failed");
     }
 
     for (int i = 0; i < NUM_TASK; i++) {
         if (g_FsmNotifQueue[i] == NULL) {
-            Serial.println("Fsm Notif queue created failed");
+            DEBUG_LEVEL_1("Fsm Notif queue created failed");
         }
     }
 }

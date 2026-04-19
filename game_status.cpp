@@ -69,7 +69,7 @@ void InitGameStatusTask() {
     // init timer for game count down
     gameTimer = timerBegin(1000000); // API v3.0, (freq: 1Mhz -> 1us per counter tick)
     if (gameTimer == nullptr) {
-        Serial.println("Failed to create timer.");
+        DEBUG_LEVEL_1("Failed to create timer.");
         while (true) {
             delay(1000);
         }
@@ -100,7 +100,7 @@ void GameStatusTask(void *parameter) {
                 &notif_item, 
                 portMAX_DELAY) == pdPASS) {
 
-            Serial.println("notif from fsm rcvd by GameStatus");
+            DEBUG_LEVEL_1("notif from fsm rcvd by GameStatus");
 
             switch (notif_item.type) {
                 case FsmNotifType::StateChanged:
@@ -111,14 +111,14 @@ void GameStatusTask(void *parameter) {
                         timerRestart(gameTimer);
                         timerStart(gameTimer);
 
-                        Serial.println("Game started.");
+                        DEBUG_LEVEL_1("Game started.");
                     } else if(game_started && (notif_item.data.state == RobotState::IDLE)) {
                         game_started = false;
                         digitalWrite(GAME_STARTED_LED_PIN, LOW);
                         // stop timer in case
                         timerStop(gameTimer);
 
-                        Serial.println("Game stopped / returned to IDLE.");
+                        DEBUG_LEVEL_1("Game stopped / returned to IDLE.");
                     }
                     break;
                 default:
