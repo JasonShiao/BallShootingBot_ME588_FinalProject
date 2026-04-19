@@ -11,31 +11,30 @@
 #define NUMPIXELS  1 // Popular NeoPixel ring size
 
 // declare
-void TeamStatusTask(void *parameter);
-TaskHandle_t TeamStatusTaskHandle = NULL;
+void teamStatusTask(void *parameter);
+TaskHandle_t teamStatusTaskHandle = NULL;
 
 Adafruit_NeoPixel pixels(NUMPIXELS, NeoPixel_PIN, NEO_GRB + NEO_KHZ800);
 
-static volatile uint32_t last_btn_isr_us = 0; // for debounce
+static volatile uint32_t lastBtnIsr_us = 0; // for debounce
 // keep a copy of state inside (might be older then latest fsm state for a short time)
-static volatile RobotState curr_state = RobotState::IDLE; 
-static RobotTeam curr_team = RobotTeam::RED;
+static volatile RobotState currState = RobotState::Idle; 
+static RobotTeam currTeam = RobotTeam::Red;
 
 
 void ARDUINO_ISR_ATTR onTeamSwitchBtnInterrupt() {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
     uint32_t now = micros();
-    if ((now - last_btn_isr_us) > 50000) {  // 50 ms debounce
-        last_btn_isr_us = now;
+    if ((now - lastBtnIsr_us) > 50000) {  // 50 ms debounce
+        lastBtnIsr_us = now;
         
-        if (curr_state == RobotState::IDLE) {
-        //if ((curr_state == RobotState::IDLE) && (digitalRead(TEAM_SELECT_INPUT_PIN) == HIGH)) {
+        if (currState == RobotState::Idle) {
             // Send team change to queue
             FsmEventQueueItem ev{};
             ev.type = FsmEventType::TeamChangeReq;
             ev.data.teamChanged = true;
-            BaseType_t ok = xQueueSendFromISR(g_FsmEventQueue, &ev, &xHigherPriorityTaskWoken);
+            BaseType_t ok = xQueueSendFromISR(g_fsmEventQueue, &ev, &xHigherPriorityTaskWoken);
         }
     }
     
@@ -43,7 +42,7 @@ void ARDUINO_ISR_ATTR onTeamSwitchBtnInterrupt() {
 }
 
 
-void InitTeamStatusTask() {
+void initTeamStatusTask() {
     pixels.begin();
     pixels.clear();
     pixels.show();
@@ -53,9 +52,9 @@ void InitTeamStatusTask() {
     attachInterrupt(digitalPinToInterrupt(TEAM_SELECT_INPUT_PIN), onTeamSwitchBtnInterrupt, RISING);
 
     pixels.clear();
-    if (curr_team == RobotTeam::RED) {
+    if (currTeam == RobotTeam::Red) {
         pixels.setPixelColor(0, pixels.Color(150, 0, 0));
-    } else if (curr_team == RobotTeam::BLUE) {
+    } else if (currTeam == RobotTeam::Blue) {
         pixels.setPixelColor(0, pixels.Color(0, 0, 150));
     } else {
         pixels.setPixelColor(0, pixels.Color(150, 150, 150));
@@ -63,31 +62,31 @@ void InitTeamStatusTask() {
     pixels.show(); 
 
     xTaskCreatePinnedToCore(
-        TeamStatusTask,         // Task function
+        teamStatusTask,         // Task function
         "TeamStatusTask",       // Task name
         2048,             // Stack size (bytes)
         NULL,              // Parameters
         1,                 // Priority
-        &TeamStatusTaskHandle,  // Task handle
+        &teamStatusTaskHandle,  // Task handle
         1                  // Core 1
     );
 
 }
 
-void TeamStatusTask(void *parameter) {
+void teamStatusTask(void *parameter) {
     FsmNotifQueueItem notif_item;
 
     for (;;) { // Infinite loop
         if (xQueueReceive(
-                g_FsmNotifQueue[ToIndex(TaskId::TeamStatus)], 
+                g_fsmNotifQueue[toIndex(TaskId::TeamStatus)], 
                 &notif_item, 
                 portMAX_DELAY) == pdPASS) {
         
-            DEBUG_LEVEL_1("notif from fsm rcvd by TeamStatus");
+            DEBUG_LEVEL_2("notif from fsm rcvd by TeamStatus");
 
             switch (notif_item.type) {
                 case FsmNotifType::TeamChanged:
-                    if (notif_item.data.team == RobotTeam::RED) {
+                    if (notif_item.data.team == RobotTeam::Red) {
                         pixels.clear();
                         pixels.setPixelColor(0, pixels.Color(150, 0, 0));
                         pixels.show();   // Send the updated pixel colors to the hardware.
@@ -100,10 +99,10 @@ void TeamStatusTask(void *parameter) {
 
                         DEBUG_LEVEL_1("Team BLUE");
                     }
-                    curr_team = notif_item.data.team;
+                    currTeam = notif_item.data.team;
                     break;
                 case FsmNotifType::StateChanged:
-                    curr_state = notif_item.data.state;
+                    currState = notif_item.data.state;
                     break;
                 default:
                     break;

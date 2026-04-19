@@ -1,6 +1,8 @@
 #include "globals.h"
 #include "team_status.h"
 #include "game_status.h"
+#include "ball_launcher.h"
+#include "user_interface.h"
 //#include "line_follower.h"
 #include "fsm.h"
 
@@ -11,10 +13,13 @@ void setup() {
   initQueues(); // for inter-task communications
 
   //InitLineFollowerTask();
-  InitTeamStatusTask(); // RED, BLUE team selection and RGB LED indicator
-  InitGameStatusTask(); // game status: idle, start. green LED indicator
+  initTeamStatusTask(); // RED, BLUE team loyalty and RGB LED indicator
+  initGameStatusTask(); // game status: idle, start. green LED indicator
+  initBallLauncherTask();
+
+  initUserInterface();
   
-  InitFsmTask();
+  initFsmTask();
 }
 
 void loop() {

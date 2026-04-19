@@ -9,36 +9,44 @@
 enum class TaskId {
   GameStatus = 0,
   TeamStatus,
+  BallLauncher,
+  UserInterface,
   Count
 };
 
 constexpr size_t NUM_TASK =
     static_cast<size_t>(TaskId::Count);
 
-constexpr size_t ToIndex(TaskId id) {
+constexpr size_t toIndex(TaskId id) {
     return static_cast<size_t>(id);
 }
 
-extern QueueHandle_t g_FsmNotifQueue[NUM_TASK]; // fsm task -> other task, created in each task
-extern QueueHandle_t g_FsmEventQueue;    // other -> fsm task
+constexpr size_t EVENT_QUEUE_SIZE = 20;
+constexpr size_t NOTIF_QUEUE_SIZE = 10;
+extern QueueHandle_t g_fsmNotifQueue[NUM_TASK]; // fsm task -> other task, created in each task
+extern QueueHandle_t g_fsmEventQueue;    // other -> fsm task
 
 // -----------------------
 enum class RobotState {
-    IDLE,
-    STARTED
+    Idle,
+    Started,
+    LaunchingBall
 };
 
 enum class RobotTeam {
-  BLUE,
-  RED
+  Blue,
+  Red
 };
 // -----------------------
 
 /* ---------- Event (request) sent from other to FSM task ------------- */
 enum class FsmEventType {
     GameStartReq,
-    GameTimeoutReq,
-    TeamChangeReq
+    GameTimeout,
+    TeamChangeReq,
+    BallLaunched,
+    BucketEmptyDetected,
+    UserStateChangeReq
 };
 
 // struct LineDetectedData {
@@ -53,6 +61,8 @@ struct FsmEventQueueItem {
     union {
         bool startPressed;
         bool teamChanged;
+        bool ballLaunched;
+        RobotState newState;
         // LineDetectedData lineDetected;
     } data;
 };

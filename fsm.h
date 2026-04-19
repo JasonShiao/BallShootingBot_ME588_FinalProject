@@ -13,11 +13,11 @@ class RobotFSM {
     RobotTeam get_team();
     void toggle_team();
   private:
-    RobotState _state = RobotState::IDLE;
-    RobotTeam _team = RobotTeam::RED;
+    RobotState _state = RobotState::Idle;
+    RobotTeam _team = RobotTeam::Red;
 };
 
-void InitFsmTask();
+void initFsmTask();
 
 
 #endif

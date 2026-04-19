@@ -3,6 +3,6 @@
 
 #define TEAM_SELECT_INPUT_PIN 21
 
-void InitTeamStatusTask();
+void initTeamStatusTask();
 
 #endif
