@@ -7,8 +7,8 @@
 
 void ballLauncherTask(void *parameter);
 TaskHandle_t ballLauncherTaskHandle = NULL;
+TimerHandle_t ballLauncherTimerHandle = NULL;
 
-hw_timer_t* ballLaunchTimer = nullptr;
 static const uint32_t BALL_LAUNCH_DURATION_MS = 3000; // 3s
 Servo ballLoadServo;
 Servo ballShootServo;
@@ -24,18 +24,16 @@ int servoAngleToMicroseconds(int angle) {
     return micros;
 }
 
-// n seconds of wait after shooting, notify FSM to switch to IR beacon detection state
-void ARDUINO_ISR_ATTR onBallLaunchTimeoutInterrupt() {
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-
+void onBallLaunchTimeoutCallback(TimerHandle_t xTimer) {
     if (isLaunchingBall) {
         FsmEventQueueItem ev{};
         ev.type = FsmEventType::BallLaunched;
         ev.data.ballLaunched = true;
-        BaseType_t ok = xQueueSendFromISR(g_fsmEventQueue, &ev, &xHigherPriorityTaskWoken);
+        BaseType_t ok = xQueueSend(g_fsmEventQueue, &ev, 0);
+        if (ok != pdPASS) {
+            // queue full, handle error if needed
+        }
     }
-
-    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
 void initBallLauncherTask() {
@@ -52,17 +50,13 @@ void initBallLauncherTask() {
     ballLoadServo.attach(BALL_LOADING_SERVO_PIN, 500, 2500);
     ballShootServo.attach(BALL_SHOOTING_SERVO_PIN, 500, 2500);
 
-    // create timer for ball launched
-    ballLaunchTimer = timerBegin(1000000); // API v3.0, (freq: 1Mhz -> 1us per counter tick)
-    if (ballLaunchTimer == nullptr) {
-        DEBUG_LEVEL_1("Failed to create timer.");
-        while (true) {
-            delay(1000);
-        }
-    }
-    timerAttachInterrupt(ballLaunchTimer, &onBallLaunchTimeoutInterrupt);
-    timerAlarm(ballLaunchTimer, BALL_LAUNCH_DURATION_MS * 1000ULL, false, 0); // one-shot timeout alarm
-    timerStop(ballLaunchTimer);
+    // create timer for ball launched (wait for ball in the air)
+    ballLauncherTimerHandle = xTimerCreate( 
+        "BallLauncherTimerHandle",
+        pdMS_TO_TICKS(BALL_LAUNCH_DURATION_MS),
+        pdFALSE,
+        (void *) 0,
+        onBallLaunchTimeoutCallback);
 
     // create and register task
     xTaskCreatePinnedToCore(
@@ -121,10 +115,11 @@ void ballLauncherTask(void *parameter) {
                             ballShootServo.writeMicroseconds(servoAngleToMicroseconds(0));
                             vTaskDelay(pdMS_TO_TICKS(500));
 
-                            // reset and start timer
-                            timerRestart(ballLaunchTimer);
-                            timerStart(ballLaunchTimer);
-
+                            // start timer
+                            if (xTimerStart(ballLauncherTimerHandle, 0) != pdPASS) {
+                                // error handling
+                                DEBUG_LEVEL_1("[Error] Ball Launch timer start failed");
+                            }
                             DEBUG_LEVEL_1("Ball should've been launched in the air. Wait for 3 sec...");
                         }
                     } else if (isLaunchingBall && (notif_item.data.state != RobotState::LaunchingBall)) {
@@ -132,7 +127,7 @@ void ballLauncherTask(void *parameter) {
                         digitalWrite(SHOOTING_LED_PIN, LOW);
 
                         // stop timer in case
-                        timerStop(ballLaunchTimer);
+                        xTimerStop(ballLauncherTimerHandle, 0);
 
                         DEBUG_LEVEL_1("Ball launch stopped.");
                     }

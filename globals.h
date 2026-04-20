@@ -11,6 +11,7 @@ enum class TaskId {
   GameStatus = 0,
   TeamStatus,
   BallLauncher,
+  IrBeaconDetector,
   UserInterface,
   Count
 };
@@ -31,6 +32,7 @@ extern QueueHandle_t g_fsmEventQueue;    // other -> fsm task
 enum class RobotState {
     Idle,
     Started,
+    CheckHillLoyalty,
     LaunchingBall,
     ForceStopped,
     Error

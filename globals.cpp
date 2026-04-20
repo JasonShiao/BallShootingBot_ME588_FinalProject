@@ -29,6 +29,7 @@ const char* stateToString(RobotState s) {
     switch (s) {
         case RobotState::Idle:           return "Idle";
         case RobotState::Started:          return "Started";
+        case RobotState::CheckHillLoyalty:     return "CheckHillLoyalty";
         case RobotState::LaunchingBall:        return "LaunchingBall";
         case RobotState::ForceStopped:    return "ForceStopped";
         case RobotState::Error: return "Error";
@@ -43,6 +44,10 @@ bool stringToState(const String& str, RobotState& out) {
     }
     if (str == "Started") {
         out = RobotState::Started;
+        return true;
+    }
+    if (str == "CheckHillLoyalty") {
+        out = RobotState::CheckHillLoyalty;
         return true;
     }
     if (str == "LaunchingBall") {

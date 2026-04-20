@@ -8,19 +8,19 @@ void fsmTask(void *parameter);
 TaskHandle_t fsmTaskHandle = nullptr;
 
 
-RobotState RobotFSM::get_state() {
+RobotState RobotFSM::getState() {
   return _state;
 }
 
-void RobotFSM::set_state(RobotState new_state) {
+void RobotFSM::setState(RobotState new_state) {
     _state = new_state;
 }
 
-RobotTeam RobotFSM::get_team() {
+RobotTeam RobotFSM::getTeam() {
   return _team;
 }
 
-void RobotFSM::toggle_team() {
+void RobotFSM::toggleTeam() {
     _team = (_team == RobotTeam::Blue) ? RobotTeam::Red : RobotTeam::Blue;
 }
 
@@ -37,17 +37,9 @@ void initFsmTask() {
     );
 }
 
-inline FsmNotifQueueItem makeStateChangedNotif(RobotState state, RobotTeam team) {
+inline FsmNotifQueueItem makeChangedNotif(FsmNotifType notifType, RobotState state, RobotTeam team) {
     FsmNotifQueueItem n{};
-    n.type = FsmNotifType::StateChanged;
-    n.data.state = state;
-    n.data.team = team;
-    return n;
-}
-
-inline FsmNotifQueueItem makeTeamChangedNotif(RobotState state, RobotTeam team) {
-    FsmNotifQueueItem n{};
-    n.type = FsmNotifType::TeamChanged;
+    n.type = notifType;
     n.data.state = state;
     n.data.team = team;
     return n;
@@ -74,58 +66,58 @@ void fsmTask(void *parameter) {
                 case FsmEventType::GameStartReq:
                     DEBUG_LEVEL_1("Game start req");
                     // TODO:
-                    if (fsm.get_state() == RobotState::Idle) {
-                        fsm.set_state(RobotState::Started);
-                        notif = makeStateChangedNotif(fsm.get_state(), fsm.get_team());
+                    if (fsm.getState() == RobotState::Idle) {
+                        fsm.setState(RobotState::Started);
+                        notif = makeChangedNotif(FsmNotifType::StateChanged, fsm.getState(), fsm.getTeam());
                         broadcastNotif(notif);
                     }
                     break;
                 case FsmEventType::GameTimeout:
                     DEBUG_LEVEL_1("Game timeout event");
                     // TODO:
-                    if (fsm.get_state() == RobotState::Started) {
-                        fsm.set_state(RobotState::Idle);
-                        notif = makeStateChangedNotif(fsm.get_state(), fsm.get_team());
+                    if (fsm.getState() == RobotState::Started) {
+                        fsm.setState(RobotState::Idle);
+                        notif = makeChangedNotif(FsmNotifType::StateChanged, fsm.getState(), fsm.getTeam());
                         broadcastNotif(notif);
                     }
                     break;
                 case FsmEventType::TeamChangeReq:
                     DEBUG_LEVEL_1("Team change req");
                     // TODO:
-                    if (fsm.get_state() == RobotState::Idle) {
-                        fsm.toggle_team();
-                        notif = makeTeamChangedNotif(fsm.get_state(), fsm.get_team());
+                    if (fsm.getState() == RobotState::Idle) {
+                        fsm.toggleTeam();
+                        notif = makeChangedNotif(FsmNotifType::TeamChanged, fsm.getState(), fsm.getTeam());
                         broadcastNotif(notif);
                     }
                     break;
                 case FsmEventType::BallLaunched:
                     DEBUG_LEVEL_1("Ball launched event");
-                    if (fsm.get_state() == RobotState::LaunchingBall) {
+                    if (fsm.getState() == RobotState::LaunchingBall) {
                         // TODO: transition to IR beacon polling instead of idle
-                        fsm.set_state(RobotState::Idle);
-                        notif = makeStateChangedNotif(fsm.get_state(), fsm.get_team());
+                        fsm.setState(RobotState::Idle);
+                        notif = makeChangedNotif(FsmNotifType::StateChanged, fsm.getState(), fsm.getTeam());
                         broadcastNotif(notif);
                     }
                     break;
                 case FsmEventType::BucketEmptyDetected:
                     DEBUG_LEVEL_1("Bucket empty event");
-                    if (fsm.get_state() == RobotState::LaunchingBall) {
+                    if (fsm.getState() == RobotState::LaunchingBall) {
                         // TODO:
-                        fsm.set_state(RobotState::Idle);
-                        notif = makeStateChangedNotif(fsm.get_state(), fsm.get_team());
+                        fsm.setState(RobotState::Idle);
+                        notif = makeChangedNotif(FsmNotifType::StateChanged, fsm.getState(), fsm.getTeam());
                         broadcastNotif(notif);
                     }
                     break;
                 case FsmEventType::UserStateChangeReq:
                     DEBUG_LEVEL_1("User state change req");
-                    fsm.set_state(ev.data.newState);
-                    notif = makeStateChangedNotif(fsm.get_state(), fsm.get_team());
+                    fsm.setState(ev.data.newState);
+                    notif = makeChangedNotif(FsmNotifType::StateChanged, fsm.getState(), fsm.getTeam());
                     broadcastNotif(notif);
                     
                     // immediately from force stopped to idle
                     if (ev.data.newState == RobotState::ForceStopped) {
-                        fsm.set_state(RobotState::Idle);
-                        notif = makeStateChangedNotif(fsm.get_state(), fsm.get_team());
+                        fsm.setState(RobotState::Idle);
+                        notif = makeChangedNotif(FsmNotifType::StateChanged, fsm.getState(), fsm.getTeam());
                         broadcastNotif(notif);
                     }
                     break;

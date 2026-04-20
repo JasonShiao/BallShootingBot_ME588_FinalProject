@@ -8,10 +8,10 @@
 
 class RobotFSM {
   public:
-    RobotState get_state();
-    void set_state(RobotState);
-    RobotTeam get_team();
-    void toggle_team();
+    RobotState getState();
+    void setState(RobotState);
+    RobotTeam getTeam();
+    void toggleTeam();
   private:
     RobotState _state = RobotState::Idle;
     RobotTeam _team = RobotTeam::Red;
