@@ -8,6 +8,8 @@
 #define IR_BEACON_DETECT_PERIOD_MS 60 // 60ms -> 750Hz ~ 45 pulses; 1500Hz ~ 90 pulses
 #define IR_BEACON_FREQ_PERIODIC_REPORT_PERIOD 1000 // 1 per second
 
+//#define FULLY_AUTONOMOUS 1
+
 #define DEBUG_LEVEL_1(fmt, ...) \
     do { if (DEBUG_LEVEL >= 1) Serial.printf(fmt "\n", ##__VA_ARGS__); } while(0)
 

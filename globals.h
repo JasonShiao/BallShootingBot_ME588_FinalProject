@@ -12,7 +12,10 @@ enum class TaskId {
   TeamStatus,
   BallLauncher,
   IrBeaconDetector,
+#ifndef FULLY_AUTONOMOUS
   UserInterface,
+  ManualControl,
+#endif
   Count
 };
 
@@ -35,6 +38,7 @@ enum class RobotState {
     CheckHillLoyalty,
     LaunchingBall,
     ForceStopped,
+    ManualControl,
     Error
 };
 
@@ -44,7 +48,7 @@ enum class RobotTeam {
 };
 
 const char* stateToString(RobotState s);
-bool stringToState(const String& str, RobotState& out);
+bool stringToState(const char* str, RobotState& out);
 // -----------------------
 
 /* ---------- Event (request) sent from other to FSM task ------------- */

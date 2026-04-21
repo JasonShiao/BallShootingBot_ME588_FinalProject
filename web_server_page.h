@@ -42,7 +42,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       align-items: center;
       flex-wrap: wrap;
     }
-    select, button {
+    select, button, input[type="range"] {
       font-size: 1rem;
       padding: 8px 12px;
     }
@@ -86,6 +86,68 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     .stop-btn:active {
       transform: scale(0.96);
     }
+
+    .motion-card.disabled {
+      opacity: 0.5;
+    }
+    .motion-status {
+      font-size: 0.95rem;
+      margin-bottom: 12px;
+      color: #555;
+    }
+    .speed-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+    #speedSlider {
+      width: 240px;
+    }
+    #speedValue {
+      min-width: 48px;
+      font-weight: bold;
+    }
+    .dpad-8 {
+      display: grid;
+      grid-template-columns: 80px 80px 80px;
+      grid-template-rows: 56px 56px 56px;
+      gap: 8px;
+      justify-content: start;
+      align-items: stretch;
+    }
+    .motion-btn {
+      border: none;
+      border-radius: 10px;
+      background: #2d6cdf;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+      transition: transform 0.08s ease, background 0.2s ease;
+    }
+    .motion-btn:hover:not(:disabled) {
+      background: #1f57bb;
+    }
+    .motion-btn:active:not(:disabled) {
+      transform: scale(0.97);
+    }
+    .motion-btn:disabled {
+      background: #b8c2d6;
+      color: #eef2f8;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    .motion-stop {
+      background: #666;
+    }
+    .motion-stop:hover:not(:disabled) {
+      background: #4f4f4f;
+    }
+    .empty-cell {
+      visibility: hidden;
+    }
   </style>
 </head>
 <body>
@@ -104,12 +166,41 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
         <option value="CheckHillLoyalty">CheckHillLoyalty</option>
         <option value="LaunchingBall">LaunchingBall</option>
         <option value="ForceStopped">ForceStopped</option>
+        <option value="ManualControl">ManualControl</option>
         <option value="Error">Error</option>
       </select>
       <button id="sendBtn">Send</button>
       <button id="stopBtn" class="stop-btn" title="Force Stop">STOP</button>
     </div>
     <div id="statusMsg"></div>
+  </div>
+
+  <div class="card motion-card" id="motionCard">
+    <h2>Manual Motion Control</h2>
+    <div class="motion-status" id="motionStatus">
+      Motion controls are enabled only in ManualControl state.
+    </div>
+
+    <div class="speed-row">
+      <label for="speedSlider">Speed</label>
+      <input type="range" id="speedSlider" min="0" max="255" value="120">
+      <span id="speedValue">120</span>
+    </div>
+
+    <!-- D-pad with diagonals -->
+    <div class="dpad-8">
+      <button class="motion-btn" id="btnForwardLeft">↖</button>
+      <button class="motion-btn" id="btnForward">↑</button>
+      <button class="motion-btn" id="btnForwardRight">↗</button>
+
+      <button class="motion-btn" id="btnRotateCCW">⟲</button>
+      <div class="dpad-center"></div>
+      <button class="motion-btn" id="btnRotateCW">⟳</button>
+
+      <button class="motion-btn" id="btnBackwardLeft">↙</button>
+      <button class="motion-btn" id="btnBackward">↓</button>
+      <button class="motion-btn" id="btnBackwardRight">↘</button>
+    </div>
   </div>
 
   <div class="card">
@@ -125,6 +216,37 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     const stateSelect = document.getElementById("stateSelect");
     const statusMsg = document.getElementById("statusMsg");
 
+    const btnForward = document.getElementById("btnForward");
+    const btnForwardRight = document.getElementById("btnForwardRight");
+    const btnForwardLeft = document.getElementById("btnForwardLeft");
+    const btnBackward = document.getElementById("btnBackward");
+    const btnBackwardRight = document.getElementById("btnBackwardRight");
+    const btnBackwardLeft = document.getElementById("btnBackwardLeft");
+    const btnRotateCW = document.getElementById("btnRotateCW");
+    const btnRotateCCW = document.getElementById("btnRotateCCW");
+    
+    const motionButtons = [
+        btnForward,
+        btnForwardRight,
+        btnForwardLeft,
+        btnBackward,
+        btnBackwardRight,
+        btnBackwardLeft,
+        btnRotateCW,
+        btnRotateCCW
+    ];
+
+    const motionBtnMap = {
+      btnForward: "Forward",
+      btnForwardRight: "ForwardRight",
+      btnForwardLeft: "ForwardLeft",
+      btnBackward: "Backward",
+      btnBackwardRight: "BackwardRight",
+      btnBackwardLeft: "BackwardLeft",
+      btnRotateCW: "RotateCW",
+      btnRotateCCW: "RotateCCW",
+    };
+
     function escapeHtml(text) {
       const div = document.createElement("div");
       div.textContent = text;
@@ -139,6 +261,24 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       logEl.scrollTop = logEl.scrollHeight;
     }
 
+    function isManualControlState() {
+      return currentStateEl.textContent === "ManualControl";
+    }
+
+    function updateMotionWidgets() {
+      const enabled = isManualControlState();
+
+      motionCard.classList.toggle("disabled", !enabled);
+      speedSlider.disabled = !enabled;
+      for (const btn of motionButtons) {
+        btn.disabled = !enabled;
+      }
+
+      motionStatus.textContent = enabled
+        ? "Manual motion control enabled."
+        : "Motion controls are enabled only in ManualControl state.";
+    }
+
     async function loadInitialState() {
       try {
         const res = await fetch("/state");
@@ -150,6 +290,8 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
         for (const entry of data.log) {
           addLogEntry(entry);
         }
+
+        updateMotionWidgets();
       } catch (err) {
         addLogEntry("Failed to load initial state");
       }
@@ -172,6 +314,34 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       }
     }
 
+    async function sendMotion(dir) {
+      if (!isManualControlState()) {
+        statusMsg.textContent = "Motion control is only available in ManualControl state";
+        updateMotionWidgets();
+        return;
+      }
+
+      const speed = speedSlider.value;
+      statusMsg.textContent = "";
+
+      try {
+        const res = await fetch("/motionCmd", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: "dir=" + encodeURIComponent(dir) + "&speed=" + encodeURIComponent(speed)
+        });
+
+        const text = await res.text();
+        statusMsg.textContent = text;
+      } catch (err) {
+        statusMsg.textContent = "Motion request failed";
+      }
+    }
+
+    speedSlider.addEventListener("input", () => {
+      speedValue.textContent = speedSlider.value;
+    });
+
     sendBtn.addEventListener("click", async () => {
       await sendState(stateSelect.value);
     });
@@ -180,10 +350,20 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       await sendState("ForceStopped");
     });
 
+    for (const id in motionBtnMap) {
+      const el = document.getElementById(id);
+      if (!el) continue;
+
+      el.addEventListener("click", async () => {
+        await sendMotion(motionBtnMap[id]);
+      });
+    }
+
     const evtSource = new EventSource("/events");
 
     evtSource.addEventListener("state", (event) => {
       currentStateEl.textContent = event.data;
+      updateMotionWidgets();
     });
 
     evtSource.addEventListener("log", (event) => {
@@ -199,6 +379,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     };
 
     loadInitialState();
+    updateMotionWidgets();
   </script>
 </body>
 </html>

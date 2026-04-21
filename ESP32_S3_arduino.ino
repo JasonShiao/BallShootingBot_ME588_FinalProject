@@ -3,9 +3,13 @@
 #include "game_status.h"
 #include "ball_launcher.h"
 #include "ir_beacon_detect.h"
-#include "user_interface.h"
+#include "mobility.h"
 //#include "line_follower.h"
 #include "fsm.h"
+#ifndef FULLY_AUTONOMOUS
+  #include "manual_control.h"
+  #include "user_interface.h"
+#endif
 
 void setup() {
   // put your setup code here, to run once:
@@ -18,8 +22,12 @@ void setup() {
   initGameStatusTask(); // game status: idle, start. green LED indicator
   initBallLauncherTask();
   initIrBeaconDetect();
+  initMobility(); // for motor ctrl
 
+#ifndef FULLY_AUTONOMOUS
+  initManualControl();
   initUserInterface();
+#endif
   
   initFsmTask();
 }

@@ -32,33 +32,38 @@ const char* stateToString(RobotState s) {
         case RobotState::CheckHillLoyalty:     return "CheckHillLoyalty";
         case RobotState::LaunchingBall:        return "LaunchingBall";
         case RobotState::ForceStopped:    return "ForceStopped";
+        case RobotState::ManualControl:   return "ManualControl";
         case RobotState::Error: return "Error";
         default:                         return "Unknown";
     }
 }
 
-bool stringToState(const String& str, RobotState& out) {
-    if (str == "Idle") {
+bool stringToState(const char* str, RobotState& out) {
+    if (strcmp(str, "Idle") == 0) {
         out = RobotState::Idle;
         return true;
     }
-    if (str == "Started") {
+    if (strcmp(str, "Started") == 0) {
         out = RobotState::Started;
         return true;
     }
-    if (str == "CheckHillLoyalty") {
+    if (strcmp(str, "CheckHillLoyalty") == 0) {
         out = RobotState::CheckHillLoyalty;
         return true;
     }
-    if (str == "LaunchingBall") {
+    if (strcmp(str, "LaunchingBall") == 0) {
         out = RobotState::LaunchingBall;
         return true;
     }
-    if (str == "ForceStopped") {
+    if (strcmp(str, "ForceStopped") == 0) {
         out = RobotState::ForceStopped;
         return true;
     }
-    if (str == "Error") {
+    if (strcmp(str, "ManualControl") == 0) {
+        out = RobotState::ManualControl;
+        return true;
+    }
+    if (strcmp(str, "Error") == 0) {
         out = RobotState::Error;
         return true;
     }

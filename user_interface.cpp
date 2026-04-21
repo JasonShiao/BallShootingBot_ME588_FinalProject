@@ -5,8 +5,11 @@
 #include <WiFi.h>
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
+#include "manual_control.h"
 
 #include "web_server_page.h"
+
+bool parseInt(const char* str, int& out);
 
 void userIntefaceTask(void *parameter);
 TaskHandle_t userInterfaceTaskHandle = NULL;
@@ -185,8 +188,10 @@ void setupWebServer() {
             return;
         }
 
-        String stateStr = request->getParam("state", true)->value();
+        // const char* stateStr = request->getParam("state", true)->value().c_str();
         RobotState newState;
+        const AsyncWebParameter* pState = request->getParam("state", true);
+        const char* stateStr = pState->value().c_str();
 
         DEBUG_LEVEL_1("Server rcvd new state: %s", stateStr);
 
@@ -202,6 +207,48 @@ void setupWebServer() {
         BaseType_t ok = xQueueSend(g_fsmEventQueue, &ev, 0);
         if (ok == pdPASS) {
             request->send(200, "text/plain", "State command accepted");
+        } else {
+            request->send(500, "text/plain", "Command queue full");
+        }
+    });
+
+    server.on("/motionCmd", HTTP_POST, [](AsyncWebServerRequest* request) {        
+        if (!request->hasParam("dir", true)) {
+            request->send(400, "text/plain", "Missing dir parameter");
+            return;
+        }
+        if (!request->hasParam("speed", true)) {
+            request->send(400, "text/plain", "Missing speed parameter");
+            return;
+        }
+
+        // const char* dirStr = request->getParam("dir", true)->value().c_str();
+        // const char* speedStr = request->getParam("speed", true)->value().c_str();
+        const AsyncWebParameter* pDir = request->getParam("dir", true);
+        const AsyncWebParameter* pSpeed = request->getParam("speed", true);
+        const char* dirStr = pDir->value().c_str();
+        const char* speedStr = pSpeed->value().c_str();        
+
+        DEBUG_LEVEL_1("Server rcvd motion dir: %s, speed: %s", dirStr, speedStr);
+
+        MotionDir newDir;
+        int newSpeed;
+        if (!stringToDir(dirStr, newDir)) {
+            request->send(400, "text/plain", "Invalid dir");
+            return;
+        }
+        if (!parseInt(speedStr, newSpeed)) {
+            request->send(400, "text/plain", "Invalid speed");
+            return;
+        }
+
+        // Send ManualControlMotion item to Manual Control task
+        ManualControlMotionQueueItem motionCmd{};
+        motionCmd.data.dir = newDir;
+        motionCmd.data.speed = newSpeed;
+        BaseType_t ok = xQueueSend(g_manualControlQueue, &motionCmd, 0);
+        if (ok == pdPASS) {
+            request->send(200, "text/plain", "Motion command accepted");
         } else {
             request->send(500, "text/plain", "Command queue full");
         }
@@ -313,4 +360,23 @@ static void appendTransition(RobotState from, RobotState to, const char* reason)
 
     pushStateUpdateToClients(to);
     pushLogUpdateToClients(rec);
+}
+
+bool parseInt(const char* str, int& out) {
+    if (str == nullptr || *str == '\0') return false;
+
+    char* endptr;
+    long val = strtol(str, &endptr, 10);
+
+    // 1. no digits found
+    if (endptr == str) return false;
+
+    // 2. extra characters (e.g. "123abc")
+    if (*endptr != '\0') return false;
+
+    // 3. optional: range check (important!)
+    if (val < INT_MIN || val > INT_MAX) return false;
+
+    out = (int)val;
+    return true;
 }
