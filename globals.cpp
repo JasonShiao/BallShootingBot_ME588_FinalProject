@@ -69,3 +69,20 @@ bool stringToState(const char* str, RobotState& out) {
     }
     return false;
 }
+
+const char* teamToString(RobotTeam s) {
+    switch (s) {
+        case RobotTeam::Red:           return "Red";
+        case RobotTeam::Blue:          return "Blue";
+        default:                       return "Unknown";
+    }
+}
+
+const char* beaconStateToString(BeaconState s) {
+    switch (s) {
+        case BeaconState::Unknown:       return "Unknown";
+        case BeaconState::Beacon750:     return "Beacon750";
+        case BeaconState::Beacon1k5:     return "Beacon1k5";
+        default:                         return "Unknown";
+    }
+}

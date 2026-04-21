@@ -43,12 +43,21 @@ enum class RobotState {
 };
 
 enum class RobotTeam {
-  Blue,
-  Red
+    Blue,
+    Red
 };
+
+enum class BeaconState {
+    Unknown,
+    Beacon750,
+    Beacon1k5
+};
+
 
 const char* stateToString(RobotState s);
 bool stringToState(const char* str, RobotState& out);
+const char* teamToString(RobotTeam t);
+const char* beaconStateToString(BeaconState s);
 // -----------------------
 
 /* ---------- Event (request) sent from other to FSM task ------------- */
@@ -58,6 +67,7 @@ enum class FsmEventType {
     TeamChangeReq,
     BallLaunched,
     BucketEmptyDetected,
+    IrBeaconChangeDetected,
     UserStateChangeReq
 };
 
@@ -75,6 +85,7 @@ struct FsmEventQueueItem {
         bool teamChanged;
         bool ballLaunched;
         RobotState newState;
+        BeaconState newBeaconState;
         // LineDetectedData lineDetected;
     } data;
 };
@@ -84,12 +95,14 @@ struct FsmEventQueueItem {
 /* ---------- (State/Team changed) Notif sent from FSM task to worker tasks ------------- */
 enum class FsmNotifType {
   StateChanged,
-  TeamChanged
+  TeamChanged,
+  BeaconChanged
 };
 
 struct FsmNotifData {
   RobotState state;
   RobotTeam team;
+  BeaconState beacon;
 };
 
 struct FsmNotifQueueItem {

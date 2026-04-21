@@ -28,6 +28,8 @@ static constexpr size_t LOG_CAPACITY = 200;
 
 struct AppState {
     RobotState currentState = RobotState::Idle;
+    RobotTeam team = RobotTeam::Red;
+    BeaconState currentBeaconState = BeaconState::Unknown;
 
     TransitionRecord log[LOG_CAPACITY];
     size_t logHead = 0;   // index of oldest entry
@@ -43,6 +45,12 @@ void connectWiFi();
 void setupWebServer();
 static size_t appendJsonEscaped(char* dst, size_t dstSize, size_t offset, const char* src);
 static void formatLogEntry(const TransitionRecord& rec, char* out, size_t outSize);
+
+// Push update to client (server side event, SSE)
+void pushStateUpdateToClients(RobotState state);
+void pushLogUpdateToClients(const TransitionRecord& rec);
+void pushTeamUpdateToClients(RobotTeam team);
+void pushBeaconUpdateToClients(BeaconState state);
 
 void initUserInterface() {
     
@@ -78,6 +86,14 @@ void userIntefaceTask(void *parameter) {
                     if (appState.currentState != notif_item.data.state) {
                         appendTransition(appState.currentState, notif_item.data.state, "");
                     }
+                    break;
+                case FsmNotifType::TeamChanged:
+                    appState.team = notif_item.data.team;
+                    pushTeamUpdateToClients(appState.team);
+                    break;
+                case FsmNotifType::BeaconChanged:
+                    appState.currentBeaconState = notif_item.data.beacon;
+                    pushBeaconUpdateToClients(appState.currentBeaconState);
                     break;
                 default:
                     break;
@@ -144,8 +160,10 @@ void setupWebServer() {
         off += snprintf(
             json + off,
             JSON_BUF_SIZE - off,
-            "{\"currentState\":\"%s\",\"log\":[",
-            stateToString(appState.currentState)
+            "{\"currentState\":\"%s\",\"currentTeam\":\"%s\",\"currentBeaconState\":\"%s\",\"log\":[",
+            stateToString(appState.currentState),
+            teamToString(appState.team),
+            beaconStateToString(appState.currentBeaconState)
         );
 
         for (size_t i = 0; i < appState.logCount && off < JSON_BUF_SIZE; ++i) {
@@ -329,6 +347,18 @@ void pushLogUpdateToClients(const TransitionRecord& rec) {
     char msg[128];
     formatLogEntry(rec, msg, sizeof(msg));
     events.send(msg, "log", millis());
+}
+
+void pushBeaconUpdateToClients(BeaconState state) {
+    char msg[32];
+    snprintf(msg, sizeof(msg), "%s", beaconStateToString(state));
+    events.send(msg, "beacon", millis());
+}
+
+void pushTeamUpdateToClients(RobotTeam team) {
+    char msg[16];
+    snprintf(msg, sizeof(msg), "%s", teamToString(team));
+    events.send(msg, "team", millis());
 }
 
 size_t getLogPhysicalIndex(size_t logicalIndex) {

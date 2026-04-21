@@ -12,9 +12,12 @@ class RobotFSM {
     void setState(RobotState);
     RobotTeam getTeam();
     void toggleTeam();
+    void setBeacon(BeaconState);
+    BeaconState getBeacon();
   private:
     RobotState _state = RobotState::Idle;
     RobotTeam _team = RobotTeam::Red;
+    BeaconState _beacon = BeaconState::Unknown;
 };
 
 void initFsmTask();

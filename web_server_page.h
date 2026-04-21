@@ -109,6 +109,27 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       min-width: 48px;
       font-weight: bold;
     }
+    #teamState {
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-weight: bold;
+      min-width: 80px;
+      text-align: center;
+    }
+    /* Team colors */
+    #teamState.red {
+      background: #ff4d4d;
+      color: white;
+    }
+    #teamState.blue {
+      background: #4d79ff;
+      color: white;
+    }
+
+    #teamState.unknown {
+      background: #cccccc;
+      color: #333;
+    }
     .dpad-8 {
       display: grid;
       grid-template-columns: 80px 80px 80px;
@@ -151,6 +172,22 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
   </style>
 </head>
 <body>
+  <div class="card">
+    <h2>Game Context</h2>
+
+    <div class="row">
+      <div>
+        <div>Team</div>
+        <div class="state-box" id="teamState">Red</div>
+      </div>
+
+      <div>
+        <div>Beacon</div>
+        <div class="state-box" id="beaconState">Unknown</div>
+      </div>
+    </div>
+  </div>
+
   <div class="card">
     <h1>ESP32 State Monitor</h1>
     <div>Current state:</div>
@@ -211,6 +248,8 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
   <script>
     const currentStateEl = document.getElementById("currentState");
     const logEl = document.getElementById("log");
+    const teamStateEl = document.getElementById("teamState");
+    const beaconStateEl = document.getElementById("beaconState");
     const sendBtn = document.getElementById("sendBtn");
     const stopBtn = document.getElementById("stopBtn");
     const stateSelect = document.getElementById("stateSelect");
@@ -279,12 +318,30 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
         : "Motion controls are enabled only in ManualControl state.";
     }
 
+    function updateTeamUI(team) {
+      teamStateEl.textContent = team;
+
+      // remove old classes
+      teamStateEl.classList.remove("red", "blue", "unknown");
+
+      // apply new class
+      if (team === "Red") {
+        teamStateEl.classList.add("red");
+      } else if (team === "Blue") {
+        teamStateEl.classList.add("blue");
+      } else {
+        teamStateEl.classList.add("unknown");
+      }
+    }
+
     async function loadInitialState() {
       try {
         const res = await fetch("/state");
         const data = await res.json();
 
         currentStateEl.textContent = data.currentState;
+        updateTeamUI(data.currentTeam);
+        beaconStateEl.textContent = data.currentBeaconState;
         logEl.innerHTML = "";
 
         for (const entry of data.log) {
@@ -364,6 +421,14 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     evtSource.addEventListener("state", (event) => {
       currentStateEl.textContent = event.data;
       updateMotionWidgets();
+    });
+
+    evtSource.addEventListener("team", (event) => {
+      updateTeamUI(event.data);
+    });
+    
+    evtSource.addEventListener("beacon", (event) => {
+      beaconStateEl.textContent = event.data;
     });
 
     evtSource.addEventListener("log", (event) => {

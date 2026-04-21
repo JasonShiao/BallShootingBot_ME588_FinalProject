@@ -5,7 +5,7 @@
 #define WIFI_SSID "Linksys02714"
 #define WIFI_PSWD "6t81ha6a0h"
 #define SERVO_MAX_ANGLE 180 // 270
-#define IR_BEACON_DETECT_PERIOD_MS 60 // 60ms -> 750Hz ~ 45 pulses; 1500Hz ~ 90 pulses
+#define IR_BEACON_DETECT_PERIOD_MS 80 // 80ms -> 750Hz ~ 60 pulses; 1500Hz ~ 120 pulses // 60ms -> 750Hz ~ 45 pulses; 1500Hz ~ 90 pulses
 #define IR_BEACON_FREQ_PERIODIC_REPORT_PERIOD 1000 // 1 per second
 
 //#define FULLY_AUTONOMOUS 1

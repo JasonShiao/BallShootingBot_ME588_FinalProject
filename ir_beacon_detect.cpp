@@ -10,6 +10,7 @@ TimerHandle_t periodicReportTimerHandle = NULL; // report detected frequency per
 void irBeaconDetectTask(void *parameter);
 void setupPCNT();
 int detectedFreq = 0;
+BeaconState beaconState = BeaconState::Unknown;
 
 hw_timer_t* irBeaconDetectTimer = nullptr; // used for a fixed period of timeout
 
@@ -19,10 +20,26 @@ void onPeriodicReportTimeoutCallback(TimerHandle_t xTimer) {
 
 void ARDUINO_ISR_ATTR onIrBeaconDetectTimeoutInterrupt() {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    BeaconState newState = BeaconState::Unknown;
+    FsmEventQueueItem ev{};
 
     int16_t pulseCount = 0;
     pcnt_get_counter_value(IR_BEACON_PCNT_UNIT, &pulseCount);
     detectedFreq = pulseCount * 1000 / IR_BEACON_DETECT_PERIOD_MS;
+    if (detectedFreq > 700 && detectedFreq < 800) {
+        newState = BeaconState::Beacon750;
+    } else if (detectedFreq > 1400 && detectedFreq < 1600) {
+        newState = BeaconState::Beacon1k5;
+    }
+
+    if (newState != beaconState) {
+        beaconState = newState;
+
+        ev.type = FsmEventType::IrBeaconChangeDetected;
+        ev.data.newBeaconState = beaconState;
+        BaseType_t ok = xQueueSendFromISR(g_fsmEventQueue, &ev, &xHigherPriorityTaskWoken);
+    }
+
     pcnt_counter_pause(IR_BEACON_PCNT_UNIT);
     pcnt_counter_clear(IR_BEACON_PCNT_UNIT);
     pcnt_counter_resume(IR_BEACON_PCNT_UNIT);
@@ -83,7 +100,6 @@ void irBeaconDetectTask(void *parameter) {
                         timerStart(irBeaconDetectTimer);
                         xTimerStart(periodicReportTimerHandle, 0);
                     } else {
-                        // ... 
                         // stop the timer
                         timerStop(irBeaconDetectTimer);
                         xTimerStop(periodicReportTimerHandle, 0);

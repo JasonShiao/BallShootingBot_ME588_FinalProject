@@ -24,6 +24,14 @@ void RobotFSM::toggleTeam() {
     _team = (_team == RobotTeam::Blue) ? RobotTeam::Red : RobotTeam::Blue;
 }
 
+void RobotFSM::setBeacon(BeaconState newState) {
+    _beacon = newState;
+}
+
+BeaconState RobotFSM::getBeacon() {
+    return _beacon;
+}
+
 void initFsmTask() {
     // create the Task
     xTaskCreatePinnedToCore(
@@ -37,11 +45,14 @@ void initFsmTask() {
     );
 }
 
-inline FsmNotifQueueItem makeChangedNotif(FsmNotifType notifType, RobotState state, RobotTeam team) {
+inline FsmNotifQueueItem makeChangedNotif(FsmNotifType notifType) {
+    
     FsmNotifQueueItem n{};
     n.type = notifType;
-    n.data.state = state;
-    n.data.team = team;
+    n.data.state = fsm.getState();
+    n.data.team = fsm.getTeam();
+    n.data.beacon = fsm.getBeacon();
+    
     return n;
 }
 
@@ -68,7 +79,7 @@ void fsmTask(void *parameter) {
                     // TODO:
                     if (fsm.getState() == RobotState::Idle) {
                         fsm.setState(RobotState::Started);
-                        notif = makeChangedNotif(FsmNotifType::StateChanged, fsm.getState(), fsm.getTeam());
+                        notif = makeChangedNotif(FsmNotifType::StateChanged);
                         broadcastNotif(notif);
                     }
                     break;
@@ -77,7 +88,7 @@ void fsmTask(void *parameter) {
                     // TODO:
                     if (fsm.getState() == RobotState::Started) {
                         fsm.setState(RobotState::Idle);
-                        notif = makeChangedNotif(FsmNotifType::StateChanged, fsm.getState(), fsm.getTeam());
+                        notif = makeChangedNotif(FsmNotifType::StateChanged);
                         broadcastNotif(notif);
                     }
                     break;
@@ -86,7 +97,7 @@ void fsmTask(void *parameter) {
                     // TODO:
                     if (fsm.getState() == RobotState::Idle) {
                         fsm.toggleTeam();
-                        notif = makeChangedNotif(FsmNotifType::TeamChanged, fsm.getState(), fsm.getTeam());
+                        notif = makeChangedNotif(FsmNotifType::TeamChanged);
                         broadcastNotif(notif);
                     }
                     break;
@@ -95,7 +106,7 @@ void fsmTask(void *parameter) {
                     if (fsm.getState() == RobotState::LaunchingBall) {
                         // TODO: transition to IR beacon polling instead of idle
                         fsm.setState(RobotState::Idle);
-                        notif = makeChangedNotif(FsmNotifType::StateChanged, fsm.getState(), fsm.getTeam());
+                        notif = makeChangedNotif(FsmNotifType::StateChanged);
                         broadcastNotif(notif);
                     }
                     break;
@@ -104,20 +115,26 @@ void fsmTask(void *parameter) {
                     if (fsm.getState() == RobotState::LaunchingBall) {
                         // TODO:
                         fsm.setState(RobotState::Idle);
-                        notif = makeChangedNotif(FsmNotifType::StateChanged, fsm.getState(), fsm.getTeam());
+                        notif = makeChangedNotif(FsmNotifType::StateChanged);
                         broadcastNotif(notif);
                     }
+                    break;
+                case FsmEventType::IrBeaconChangeDetected:
+                    DEBUG_LEVEL_1("IR beacon changed event: %s", beaconStateToString(ev.data.newBeaconState));
+                    fsm.setBeacon(ev.data.newBeaconState);
+                    notif = makeChangedNotif(FsmNotifType::BeaconChanged);
+                    broadcastNotif(notif);
                     break;
                 case FsmEventType::UserStateChangeReq:
                     DEBUG_LEVEL_1("User state change req");
                     fsm.setState(ev.data.newState);
-                    notif = makeChangedNotif(FsmNotifType::StateChanged, fsm.getState(), fsm.getTeam());
+                    notif = makeChangedNotif(FsmNotifType::StateChanged);
                     broadcastNotif(notif);
                     
                     // immediately from force stopped to idle
                     if (ev.data.newState == RobotState::ForceStopped) {
                         fsm.setState(RobotState::Idle);
-                        notif = makeChangedNotif(FsmNotifType::StateChanged, fsm.getState(), fsm.getTeam());
+                        notif = makeChangedNotif(FsmNotifType::StateChanged);
                         broadcastNotif(notif);
                     }
                     break;
