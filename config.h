@@ -23,14 +23,29 @@
 
 //#define FULLY_AUTONOMOUS 1
 
+#if DEBUG_LEVEL >= 1
 #define DEBUG_LEVEL_1(fmt, ...) \
-    do { if (DEBUG_LEVEL >= 1) Serial.printf(fmt "\n", ##__VA_ARGS__); } while(0)
+    do { Serial.printf(fmt "\n", ##__VA_ARGS__); } while(0)
+#else
+#define DEBUG_LEVEL_1(fmt, ...) \
+    do {} while(0)
+#endif
 
+#if DEBUG_LEVEL >= 2
 #define DEBUG_LEVEL_2(fmt, ...) \
-    do { if (DEBUG_LEVEL >= 2) Serial.printf(fmt "\n", ##__VA_ARGS__); } while(0)
+    do { Serial.printf(fmt "\n", ##__VA_ARGS__); } while(0)
+#else
+#define DEBUG_LEVEL_2(fmt, ...) \
+    do {} while(0)
+#endif
 
+#if DEBUG_LEVEL >= 3
 #define DEBUG_LEVEL_3(fmt, ...) \
-    do { if (DEBUG_LEVEL >= 3) Serial.printf(fmt "\n", ##__VA_ARGS__); } while(0)
+    do { Serial.printf(fmt "\n", ##__VA_ARGS__); } while(0)
+#else
+#define DEBUG_LEVEL_3(fmt, ...) \
+    do {} while(0)
+#endif
 
 #endif 
 
