@@ -9,7 +9,7 @@
 #define MOTOR_DRIVER_IN4_PIN 14
 
 void initMobility();
-void setMotorSpeed(int speedA, int speedB);
+void setMotorSpeed(int left, int right, bool swap_heading);
 void forceMotorBrake();
 
 #endif

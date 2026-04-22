@@ -57,28 +57,28 @@ void manualControlTask(void *parameter) {
                 // TODO: set speed ...
                 switch (motion_item.data.dir) {
                     case MotionDir::Forward:
-                        setMotorSpeed(230, 230);
+                        setMotorSpeed(230, 230, false);
                         break;
                     case MotionDir::ForwardLeft:
-                        setMotorSpeed(180, 230);
+                        setMotorSpeed(180, 230, false);
                         break;
                     case MotionDir::ForwardRight:
-                        setMotorSpeed(230, 180);
+                        setMotorSpeed(230, 180, false);
                         break;
                     case MotionDir::Backward:
-                        setMotorSpeed(-230, -230);
+                        setMotorSpeed(-230, -230, false);
                         break;
                     case MotionDir::BackwardLeft:
-                        setMotorSpeed(-180, -230);
+                        setMotorSpeed(-180, -230, false);
                         break;
                     case MotionDir::BackwardRight:
-                        setMotorSpeed(-230, -180);
+                        setMotorSpeed(-230, -180, false);
                         break;
                     case MotionDir::RotateCW:
-                        setMotorSpeed(150, -150);
+                        setMotorSpeed(150, -150, false);
                         break;
                     case MotionDir::RotateCCW:
-                        setMotorSpeed(-150, 150);
+                        setMotorSpeed(-150, 150, false);
                         break;
                     default:
                         break;
@@ -98,7 +98,7 @@ void manualControlTask(void *parameter) {
                         isManualControlMode = true;
                     } else {
                         // stop motors
-                        setMotorSpeed(0, 0);
+                        setMotorSpeed(0, 0, false);
                         isManualControlMode = false;
                     }
                     break;

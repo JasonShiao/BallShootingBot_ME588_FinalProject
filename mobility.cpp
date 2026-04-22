@@ -5,7 +5,9 @@
 #define MOTOR_PWM_RESOLUTION 8  // 0–255
 #define MOTOR_PWM_MAX ((1 << MOTOR_PWM_RESOLUTION) - 1)
 
-static void brake();
+static void setMotorSpeedPrivate(int speedA, int speedB);
+static void setSingleMotor(int speed, int in1Pin, int in2Pin, int enPin);
+
 
 void initMobility() {
     // Setup DIR pins
@@ -21,39 +23,40 @@ void initMobility() {
     ledcAttach(MOTOR_DRIVER_EN_B_PIN, MOTOR_PWM_FREQ, MOTOR_PWM_RESOLUTION);
 
     // Init with coast
-    setMotorSpeed(0, 0);
+    setMotorSpeed(0, 0, false);
+}
+
+void setMotorSpeed(int left, int right, bool swap_heading) {
+    if (!swap_heading) {
+        // A as left, B as right
+        setMotorSpeedPrivate(left, right);
+    } else {
+        // A as right, B as left -> also *(-1) to reverse the forward direction
+        setMotorSpeedPrivate(-right, -left);
+    }
+}
+
+static void setSingleMotor(int speed, int in1Pin, int in2Pin, int enPin) {
+    int absSpeed = constrain(abs(speed), 0, 255);
+    if (speed < 0) {
+        digitalWrite(in1Pin, LOW);
+        digitalWrite(in2Pin, HIGH);
+    } else if (speed == 0) {
+        digitalWrite(in1Pin, LOW);
+        digitalWrite(in2Pin, LOW);
+    } else {
+        digitalWrite(in1Pin, HIGH);
+        digitalWrite(in2Pin, LOW);
+    }
+    ledcWrite(enPin, absSpeed);
 }
 
 /**
  *  when speed == 0, coast instead of force brake
- * 
  */
-void setMotorSpeed(int speedA, int speedB) {
-    int absSpeedA = constrain(abs(speedA), 0, 255);
-    int absSpeedB = constrain(abs(speedB), 0, 255);
-    
-    if (speedA < 0) {
-        digitalWrite(MOTOR_DRIVER_IN1_PIN, LOW);
-        digitalWrite(MOTOR_DRIVER_IN2_PIN, HIGH);
-    } else if (speedA == 0) {
-        digitalWrite(MOTOR_DRIVER_IN1_PIN, LOW);
-        digitalWrite(MOTOR_DRIVER_IN2_PIN, LOW);
-    } else {
-        digitalWrite(MOTOR_DRIVER_IN1_PIN, HIGH);
-        digitalWrite(MOTOR_DRIVER_IN2_PIN, LOW);
-    }
-    if (speedB < 0) {
-        digitalWrite(MOTOR_DRIVER_IN3_PIN, LOW);
-        digitalWrite(MOTOR_DRIVER_IN4_PIN, HIGH);
-    } else if (speedB == 0) {
-        digitalWrite(MOTOR_DRIVER_IN3_PIN, LOW);
-        digitalWrite(MOTOR_DRIVER_IN4_PIN, LOW);
-    } else {
-        digitalWrite(MOTOR_DRIVER_IN3_PIN, HIGH);
-        digitalWrite(MOTOR_DRIVER_IN4_PIN, LOW);
-    }
-    ledcWrite(MOTOR_DRIVER_EN_A_PIN, absSpeedA);
-    ledcWrite(MOTOR_DRIVER_EN_B_PIN, absSpeedB);
+static void setMotorSpeedPrivate(int speedA, int speedB) {
+    setSingleMotor(speedA, MOTOR_DRIVER_IN1_PIN, MOTOR_DRIVER_IN2_PIN, MOTOR_DRIVER_EN_A_PIN);
+    setSingleMotor(speedB, MOTOR_DRIVER_IN3_PIN, MOTOR_DRIVER_IN4_PIN, MOTOR_DRIVER_EN_B_PIN);
 }
 
 void forceMotorBrake() {
