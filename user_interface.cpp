@@ -42,6 +42,7 @@ void pushLogRecord(const TransitionRecord& rec);
 static void appendTransition(RobotState from, RobotState to, const char* reason);
 
 void connectWiFi();
+void startSoftAP();
 void setupWebServer();
 static size_t appendJsonEscaped(char* dst, size_t dstSize, size_t offset, const char* src);
 static void formatLogEntry(const TransitionRecord& rec, char* out, size_t outSize);
@@ -54,7 +55,11 @@ void pushBeaconUpdateToClients(BeaconState state);
 
 void initUserInterface() {
     
+#if SOFT_AP_MODE
+    startSoftAP();
+#else
     connectWiFi();
+#endif
     setupWebServer();
 
     xTaskCreatePinnedToCore(
@@ -120,7 +125,7 @@ void userIntefaceTask(void *parameter) {
 }
 
 // ============================
-// Wi-Fi
+// Wi-Fi: either connect to router or serve as a AP itself
 // ============================
 void connectWiFi() {
     WiFi.mode(WIFI_STA);
@@ -136,6 +141,20 @@ void connectWiFi() {
     Serial.print("WiFi Connected");
     //Serial.print("Connected, IP address: ");
     //Serial.println(WiFi.localIP());
+}
+
+void startSoftAP() {
+    WiFi.mode(WIFI_AP);
+
+    bool ok = WiFi.softAP(WIFI_SSID, WIFI_PSWD);
+    if (!ok) {
+        Serial.println("SoftAP start failed");
+        return;
+    }
+
+    Serial.println("SoftAP started");
+    Serial.print("AP IP address: ");
+    Serial.println(WiFi.softAPIP());
 }
 
 // ============================
