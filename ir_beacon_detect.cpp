@@ -122,7 +122,7 @@ void setupPCNT() {
   pcnt_config.channel = IR_BEACON_PCNT_CHANNEL;
   pcnt_config.unit = IR_BEACON_PCNT_UNIT;
 
-  // Count only rising = num of pulse
+  // Count only rising = num of pulses
   pcnt_config.pos_mode = PCNT_COUNT_INC;  // rising edge
   pcnt_config.neg_mode = PCNT_COUNT_DIS;  // falling edge
 
@@ -134,7 +134,7 @@ void setupPCNT() {
 
   pcnt_unit_config(&pcnt_config);
 
-  pcnt_set_filter_value(IR_BEACON_PCNT_UNIT, 100);  // 80MHz -> 100 -> 100/80MHz ~ 1.25us (noise below such time width is reject)
+  pcnt_set_filter_value(IR_BEACON_PCNT_UNIT, 100);  // APB_CLK 80MHz -> 100 -> 100/80MHz ~ 1.25us (noise below such time width is reject)
   pcnt_filter_enable(IR_BEACON_PCNT_UNIT);
 
   pcnt_counter_pause(IR_BEACON_PCNT_UNIT);
