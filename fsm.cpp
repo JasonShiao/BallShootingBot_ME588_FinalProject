@@ -78,7 +78,7 @@ void fsmTask(void *parameter) {
                     DEBUG_LEVEL_1("Game start req");
                     // TODO:
                     if (fsm.getState() == RobotState::Idle) {
-                        fsm.setState(RobotState::Started);
+                        fsm.setState(RobotState::MoveToNextJunction);
                         notif = makeChangedNotif(FsmNotifType::StateChanged);
                         broadcastNotif(notif);
                     }
@@ -86,7 +86,7 @@ void fsmTask(void *parameter) {
                 case FsmEventType::GameTimeout:
                     DEBUG_LEVEL_1("Game timeout event");
                     // TODO:
-                    if (fsm.getState() == RobotState::Started) {
+                    if (isGameStartedState(fsm.getState())) {
                         fsm.setState(RobotState::Idle);
                         notif = makeChangedNotif(FsmNotifType::StateChanged);
                         broadcastNotif(notif);
@@ -103,18 +103,17 @@ void fsmTask(void *parameter) {
                     break;
                 case FsmEventType::BallLaunched:
                     DEBUG_LEVEL_1("Ball launched event");
-                    if (fsm.getState() == RobotState::LaunchingBall) {
-                        // TODO: transition to IR beacon polling instead of idle
-                        fsm.setState(RobotState::Idle);
+                    if (fsm.getState() == RobotState::BallLaunching) {
+                        fsm.setState(RobotState::WaitLoyaltyChange);
                         notif = makeChangedNotif(FsmNotifType::StateChanged);
                         broadcastNotif(notif);
                     }
                     break;
                 case FsmEventType::BucketEmptyDetected:
                     DEBUG_LEVEL_1("Bucket empty event");
-                    if (fsm.getState() == RobotState::LaunchingBall) {
+                    if (fsm.getState() == RobotState::BallLaunching) {
                         // TODO:
-                        fsm.setState(RobotState::Idle);
+                        fsm.setState(RobotState::BackHome);
                         notif = makeChangedNotif(FsmNotifType::StateChanged);
                         broadcastNotif(notif);
                     }

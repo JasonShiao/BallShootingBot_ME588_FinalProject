@@ -96,7 +96,7 @@ void gameStatusTask(void *parameter) {
 
             switch (notif_item.type) {
                 case FsmNotifType::StateChanged:
-                    if (!gameStarted && (notif_item.data.state != RobotState::Idle)) { // idle -> active
+                    if (!gameStarted && isGameStartedState(notif_item.data.state)) { // idle -> active
                         gameStarted = true;
                         digitalWrite(GAME_STARTED_LED_PIN, HIGH);
                         // reset and start timer
@@ -104,7 +104,7 @@ void gameStatusTask(void *parameter) {
                         timerStart(gameTimer);
 
                         DEBUG_LEVEL_1("Game started.");
-                    } else if (gameStarted && (notif_item.data.state == RobotState::Idle)) { // active -> idle
+                    } else if (gameStarted && !isGameStartedState(notif_item.data.state)) { // active -> idle
                         gameStarted = false;
                         digitalWrite(GAME_STARTED_LED_PIN, LOW);
                         // stop timer in case

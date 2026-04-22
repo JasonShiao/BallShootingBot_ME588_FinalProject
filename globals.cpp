@@ -25,16 +25,53 @@ void initQueues() {
     }
 }
 
+bool isGameStartedState(RobotState s) {
+    switch (s) {
+        case RobotState::Idle:
+            return false;
+        case RobotState::MoveToNextJunction:
+        case RobotState::CheckHillLoyalty:
+        case RobotState::BallLaunching:
+        case RobotState::WaitLoyaltyChange:
+        case RobotState::BackHome:
+        case RobotState::WaitBallReload:
+            return true;
+        // ====== Special states =====
+        case RobotState::ForceStopped:
+        case RobotState::ManualControl:
+        case RobotState::Error:
+            return false;
+        default:
+            return false;
+    }
+}
+
+/**
+ * Moving (autonomously), i.e. Excluding manual control
+ */
+bool isRobotMoving(RobotState s) {
+    switch (s) {
+        case RobotState::MoveToNextJunction:
+        case RobotState::BackHome:
+            return true;
+        default:
+            return false;
+    }
+}
+
 const char* stateToString(RobotState s) {
     switch (s) {
-        case RobotState::Idle:           return "Idle";
-        case RobotState::Started:          return "Started";
+        case RobotState::Idle:            return "Idle";
+        case RobotState::MoveToNextJunction:   return "MoveToNextJunction";
         case RobotState::CheckHillLoyalty:     return "CheckHillLoyalty";
         case RobotState::BallLaunching:        return "BallLaunching";
+        case RobotState::WaitLoyaltyChange:    return "WaitLoyaltyChange";
+        case RobotState::BackHome:        return "BackHome";
+        case RobotState::WaitBallReload:  return "WaitBallReload";
         case RobotState::ForceStopped:    return "ForceStopped";
         case RobotState::ManualControl:   return "ManualControl";
-        case RobotState::Error: return "Error";
-        default:                         return "Unknown";
+        case RobotState::Error:           return "Error";
+        default:                          return "Unknown";
     }
 }
 
@@ -43,8 +80,8 @@ bool stringToState(const char* str, RobotState& out) {
         out = RobotState::Idle;
         return true;
     }
-    if (strcmp(str, "Started") == 0) {
-        out = RobotState::Started;
+    if (strcmp(str, "MoveToNextJunction") == 0) {
+        out = RobotState::MoveToNextJunction;
         return true;
     }
     if (strcmp(str, "CheckHillLoyalty") == 0) {
@@ -55,6 +92,16 @@ bool stringToState(const char* str, RobotState& out) {
         out = RobotState::BallLaunching;
         return true;
     }
+    if (strcmp(str, "WaitLoyaltyChange") == 0) {
+        out = RobotState::WaitLoyaltyChange;
+        return true;
+    }
+    if (strcmp(str, "BackHome") == 0) {
+        out = RobotState::BackHome;
+        return true;
+    }
+    if (strcmp(str, "WaitBallReload") == 0) {
+        out = RobotState::WaitBallReload;
         return true;
     }
     if (strcmp(str, "ForceStopped") == 0) {

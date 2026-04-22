@@ -34,9 +34,12 @@ extern QueueHandle_t g_fsmEventQueue;    // other -> fsm task
 // -----------------------
 enum class RobotState {
     Idle,
-    Started,
+    MoveToNextJunction,
     CheckHillLoyalty,
     BallLaunching,
+    WaitLoyaltyChange,
+    BackHome,
+    WaitBallReload,
     ForceStopped,
     ManualControl,
     Error
@@ -53,7 +56,8 @@ enum class BeaconState {
     Beacon1k5
 };
 
-
+bool isGameStartedState(RobotState s);
+bool isRobotMoving(RobotState s);
 const char* stateToString(RobotState s);
 bool stringToState(const char* str, RobotState& out);
 const char* teamToString(RobotTeam t);
