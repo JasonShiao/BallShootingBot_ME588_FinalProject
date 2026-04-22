@@ -111,7 +111,7 @@ void userIntefaceTask(void *parameter) {
                 DEBUG_LEVEL_1("Force ball launching...");
                 FsmEventQueueItem ev{};
                 ev.type = FsmEventType::UserStateChangeReq;
-                ev.data.newState = RobotState::LaunchingBall;
+                ev.data.newState = RobotState::BallLaunching;
                 BaseType_t ok = xQueueSend(g_fsmEventQueue, &ev, 0);
             } else if (rcvdChar == 'w') {
                 Serial.println(WiFi.localIP());

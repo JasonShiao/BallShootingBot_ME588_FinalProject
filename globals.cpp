@@ -30,7 +30,7 @@ const char* stateToString(RobotState s) {
         case RobotState::Idle:           return "Idle";
         case RobotState::Started:          return "Started";
         case RobotState::CheckHillLoyalty:     return "CheckHillLoyalty";
-        case RobotState::LaunchingBall:        return "LaunchingBall";
+        case RobotState::BallLaunching:        return "BallLaunching";
         case RobotState::ForceStopped:    return "ForceStopped";
         case RobotState::ManualControl:   return "ManualControl";
         case RobotState::Error: return "Error";
@@ -51,8 +51,10 @@ bool stringToState(const char* str, RobotState& out) {
         out = RobotState::CheckHillLoyalty;
         return true;
     }
-    if (strcmp(str, "LaunchingBall") == 0) {
-        out = RobotState::LaunchingBall;
+    if (strcmp(str, "BallLaunching") == 0) {
+        out = RobotState::BallLaunching;
+        return true;
+    }
         return true;
     }
     if (strcmp(str, "ForceStopped") == 0) {
@@ -70,8 +72,8 @@ bool stringToState(const char* str, RobotState& out) {
     return false;
 }
 
-const char* teamToString(RobotTeam s) {
-    switch (s) {
+const char* teamToString(RobotTeam t) {
+    switch (t) {
         case RobotTeam::Red:           return "Red";
         case RobotTeam::Blue:          return "Blue";
         default:                       return "Unknown";

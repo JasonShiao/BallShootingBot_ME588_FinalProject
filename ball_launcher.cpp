@@ -84,7 +84,7 @@ void ballLauncherTask(void *parameter) {
 
             switch (notif_item.type) {
                 case FsmNotifType::StateChanged:
-                    if (!isLaunchingBall && (notif_item.data.state == RobotState::LaunchingBall)) {
+                    if (!isLaunchingBall && (notif_item.data.state == RobotState::BallLaunching)) {
                         isLaunchingBall = true;
                         // TODO: 
 
@@ -122,7 +122,7 @@ void ballLauncherTask(void *parameter) {
                             }
                             DEBUG_LEVEL_1("Ball should've been launched in the air. Wait for 3 sec...");
                         }
-                    } else if (isLaunchingBall && (notif_item.data.state != RobotState::LaunchingBall)) {
+                    } else if (isLaunchingBall && (notif_item.data.state != RobotState::BallLaunching)) {
                         isLaunchingBall = false;
                         digitalWrite(SHOOTING_LED_PIN, LOW);
 

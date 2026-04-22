@@ -36,7 +36,7 @@ enum class RobotState {
     Idle,
     Started,
     CheckHillLoyalty,
-    LaunchingBall,
+    BallLaunching,
     ForceStopped,
     ManualControl,
     Error
