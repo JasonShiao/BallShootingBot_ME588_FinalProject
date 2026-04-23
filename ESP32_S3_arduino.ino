@@ -5,6 +5,7 @@
 #include "ir_beacon_detect.h"
 #include "mobility.h"
 //#include "line_follower.h"
+#include "navigation.h"
 #include "fsm.h"
 #ifndef FULLY_AUTONOMOUS
   #include "manual_control.h"
@@ -17,7 +18,7 @@ void setup() {
 
   initQueues(); // for inter-task communications
 
-  //initLineFollowerTask();
+  initNavigation();
   initTeamStatusTask(); // RED, BLUE team loyalty and RGB LED indicator
   initGameStatusTask(); // game status: idle, start. green LED indicator
   initBallLauncherTask();

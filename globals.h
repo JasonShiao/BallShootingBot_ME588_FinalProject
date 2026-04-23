@@ -28,7 +28,7 @@ constexpr size_t toIndex(TaskId id) {
 
 constexpr size_t EVENT_QUEUE_SIZE = 20;
 constexpr size_t NOTIF_QUEUE_SIZE = 10;
-extern QueueHandle_t g_fsmNotifQueue[NUM_TASK]; // fsm task -> other task, created in each task
+//extern QueueHandle_t g_fsmNotifQueue[NUM_TASK]; // fsm task -> other task, created in each task
 extern QueueHandle_t g_fsmEventQueue;    // other -> fsm task
 
 // -----------------------
@@ -114,10 +114,10 @@ struct FsmNotifData {
   BeaconState beacon;
 };
 
-struct FsmNotifQueueItem {
-    FsmNotifType type;
-    FsmNotifData data;
-};
+// struct FsmNotifQueueItem {
+//     FsmNotifType type;
+//     FsmNotifData data;
+// };
 
 void initQueues();
 

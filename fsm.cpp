@@ -35,30 +35,13 @@ void initFsmTask() {
     );
 }
 
-// inline FsmNotifQueueItem makeChangedNotif(FsmNotifType notifType) {
-    
-//     FsmNotifQueueItem n{};
-//     n.type = notifType;
-//     n.data.state = fsm.getState();
-//     n.data.team = fsm.getTeam();
-//     n.data.beacon = fsm.getBeacon();
-    
-//     return n;
-// }
-
-// void broadcastNotif(FsmNotifQueueItem notif) {
-//     for (int i = 0; i < NUM_TASK; i++) {
-//          BaseType_t ok = xQueueSend(g_fsmNotifQueue[i], &notif, 0); // expect return: pdPASS
-//     }
-// }
-
 void fsmTask(void *parameter) {
     FsmEventQueueItem ev{};
     TeamStatusCtrlCmd teamStatusCmd{};
     UserInterfaceUpdateMsg uiUpdateCmd{};
 
     NewStates newStates{};
-    //FsmNotifQueueItem notif{};
+
     for(;;) {
         // block for event queue
 
