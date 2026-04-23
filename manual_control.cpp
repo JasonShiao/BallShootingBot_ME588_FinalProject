@@ -49,6 +49,7 @@ void manualControlTask(void *parameter) {
             DEBUG_LEVEL_2("Cmd rcvd by ManualControl");
             if (cmd.type == ManualControlCmdType::CtrlCmd) {
                 manualControlEnabled = cmd.data.enable;
+                DEBUG_LEVEL_1("Manual control %s", manualControlEnabled ? "enabled" : "disabled");
                 if (!manualControlEnabled) {
                     setMotorSpeed(0, 0, false);
                 }

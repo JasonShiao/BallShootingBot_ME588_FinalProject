@@ -35,6 +35,11 @@ void ARDUINO_ISR_ATTR onIrBeaconDetectTimeoutInterrupt() {
         newState = BeaconState::Unknown;
     }
 
+    if (newState != beaconState && g_fsmEventQueue != nullptr) {
+        ev.type = FsmEventType::IrBeaconChangeDetected;
+        ev.data.newBeaconState = newState;
+        xQueueSendFromISR(g_fsmEventQueue, &ev, &xHigherPriorityTaskWoken);
+    }
     beaconState = newState;
 
     pcnt_counter_pause(IR_BEACON_PCNT_UNIT);
@@ -71,6 +76,7 @@ void initIrBeaconDetect() {
         (void *) 0,
         onPeriodicReportTimeoutCallback);
 
+    enableRealtimeIrBeaconDetect(true, false);
 
     xTaskCreatePinnedToCore(
         irBeaconDetectTask,      // Task function
@@ -143,4 +149,18 @@ bool sendIrBeaconDetectCtrlCmd(const IrBeaconDetectCtrlCmd& cmd) {
         return false;
     }
     return xQueueSend(irBeaconDetectCmdQueue, &cmd, 0) == pdPASS;
+}
+
+void enableRealtimeIrBeaconDetect(bool enable_update, bool enable_report) {
+     if (enable_update) {
+        timerStart(irBeaconDetectTimer);
+        if (enable_report) {
+            xTimerStart(periodicReportTimerHandle, 0);
+        } else {
+            xTimerStop(periodicReportTimerHandle, 0);
+        }
+    } else {
+        timerStop(irBeaconDetectTimer);
+        xTimerStop(periodicReportTimerHandle, 0);
+    }
 }

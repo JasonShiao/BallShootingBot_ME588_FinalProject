@@ -7,9 +7,17 @@
 
 void initTeamStatusTask();
 
+enum class TeamStatusCtrlCmdType {
+    TeamChange,
+    BtnEventEnableChange
+};
+
 struct TeamStatusCtrlCmd {
-    RobotTeam team;
-    bool enableBtnEvent;
+    TeamStatusCtrlCmdType type;
+    union {
+        RobotTeam team; // for TeamChange
+        bool enableBtnEvent; // for BtnEventEnableChange
+    } data;
 };
 
 bool sendTeamStatusCtrlCmd(const TeamStatusCtrlCmd& cmd);

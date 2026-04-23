@@ -14,7 +14,7 @@ static const uint32_t GAME_DURATION_MS = 150000; // 150000// 2min30s = 150s
 
 static volatile uint32_t lastStartBtnIsr_us = 0; // for debounce
 static volatile bool gameStarted = false;
-static volatile bool btnEventEnabled = false;
+static volatile bool btnEventEnabled = true;
 
 
 void ARDUINO_ISR_ATTR onGameStartBtnInterrupt() {

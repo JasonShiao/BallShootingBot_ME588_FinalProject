@@ -67,12 +67,15 @@ const char* beaconStateToString(BeaconState s);
 /* ---------- Event (request) sent from other to FSM task ------------- */
 enum class FsmEventType {
     GameStartReq,
-    GameTimeout,
     TeamChangeReq,
+    GameTimeout,
     BallLoaded,
     BallLaunched,
     BucketEmptyDetected,
-    IrBeaconQueryResponse,
+    BallReloadTimeout,
+    IrBeaconChangeDetected, // automatically send
+    IrBeaconQueryResponse,  // response to query 
+    // === Special event below ===
     UserStateChangeReq
 };
 

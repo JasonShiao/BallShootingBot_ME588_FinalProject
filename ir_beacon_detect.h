@@ -13,4 +13,6 @@ struct IrBeaconDetectCtrlCmd {
 
 bool sendIrBeaconDetectCtrlCmd(const IrBeaconDetectCtrlCmd& cmd);
 
+void enableRealtimeIrBeaconDetect(bool enable_update, bool enable_report);
+
 #endif

@@ -88,22 +88,27 @@ void teamStatusTask(void *parameter) {
                 portMAX_DELAY) == pdPASS) {
         
             DEBUG_LEVEL_2("Cmd rcvd by TeamStatus");
+            
+            if (cmd_item.type == TeamStatusCtrlCmdType::TeamChange) {
+                if (cmd_item.data.team != currTeam) {
+                    currTeam = cmd_item.data.team;
+                    if (cmd_item.data.team == RobotTeam::Red) {
+                        pixels.clear();
+                        pixels.setPixelColor(0, pixels.Color(150, 0, 0));
+                        pixels.show();   // Send the updated pixel colors to the hardware.
+                        
+                        DEBUG_LEVEL_1("Team RED");
+                    } else {
+                        pixels.clear();
+                        pixels.setPixelColor(0, pixels.Color(0, 0, 150));
+                        pixels.show();   // Send the updated pixel colors to the hardware.
 
-            if (cmd_item.team != currTeam) {
-                currTeam = cmd_item.team;
-                if (cmd_item.team == RobotTeam::Red) {
-                    pixels.clear();
-                    pixels.setPixelColor(0, pixels.Color(150, 0, 0));
-                    pixels.show();   // Send the updated pixel colors to the hardware.
-                    
-                    DEBUG_LEVEL_1("Team RED");
-                } else {
-                    pixels.clear();
-                    pixels.setPixelColor(0, pixels.Color(0, 0, 150));
-                    pixels.show();   // Send the updated pixel colors to the hardware.
-
-                    DEBUG_LEVEL_1("Team BLUE");
+                        DEBUG_LEVEL_1("Team BLUE");
+                    }
                 }
+            } else if (cmd_item.type == TeamStatusCtrlCmdType::BtnEventEnableChange) {
+                btnEventEnabled = cmd_item.data.enableBtnEvent;
+                DEBUG_LEVEL_1("Btn event enabled: %d", btnEventEnabled);
             }
         }
     }
