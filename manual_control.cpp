@@ -5,19 +5,20 @@
 #include "mobility.h"
 
 constexpr size_t MANUAL_CONTROL_QUEUE_SIZE = 10;
-QueueHandle_t g_manualControlQueue = nullptr; // send for manual control task only
-bool isManualControlMode = false;
+bool manualControlEnabled = false;
 
-TaskHandle_t manualControlTaskHandle = NULL;
+static TaskHandle_t manualControlTaskHandle = NULL;
+static QueueHandle_t manualControlCmdQueue = nullptr; // send for manual control task only
+
 void manualControlTask(void *parameter);
 static QueueSetHandle_t xManualControlQueueSet;
 
 void initManualControl() {
     // Prepare freeRTOS queue and queue set
-    g_manualControlQueue = xQueueCreate(MANUAL_CONTROL_QUEUE_SIZE, sizeof(ManualControlMotionQueueItem));
-    xManualControlQueueSet = xQueueCreateSet(MANUAL_CONTROL_QUEUE_SIZE + NOTIF_QUEUE_SIZE);
-    xQueueAddToSet(g_fsmNotifQueue[toIndex(TaskId::ManualControl)], xManualControlQueueSet);
-    xQueueAddToSet(g_manualControlQueue, xManualControlQueueSet);
+    manualControlCmdQueue = xQueueCreate(MANUAL_CONTROL_QUEUE_SIZE, sizeof(ManualControlCmd));
+    if (manualControlCmdQueue == NULL) {
+        DEBUG_LEVEL_1("Manual control cmd queue created failed");
+    }
 
     // Create software timer for periodic report
     // periodicReportTimerHandle = xTimerCreate( 
@@ -40,22 +41,25 @@ void initManualControl() {
 
 
 void manualControlTask(void *parameter) {
-    FsmNotifQueueItem notif_item;
-    QueueSetMemberHandle_t xActivatedMember;
-    ManualControlMotionQueueItem motion_item;
+    ManualControlCmd cmd;
 
     for (;;) {
         // Block Wait for any queue in the queue set non empty
-        xActivatedMember = xQueueSelectFromSet(xManualControlQueueSet, portMAX_DELAY);
-
-        if (xActivatedMember == g_manualControlQueue) {
-            xQueueReceive(xActivatedMember, &motion_item, 0);
-
-            DEBUG_LEVEL_2("motion cmd rcvd by ManualControl");
-
-            if (isManualControlMode) {
-                // TODO: set speed ...
-                switch (motion_item.data.dir) {
+        if (xQueueReceive(manualControlCmdQueue, &cmd, 0) == pdTRUE) {
+            DEBUG_LEVEL_2("Cmd rcvd by ManualControl");
+            if (cmd.type == ManualControlCmdType::CtrlCmd) {
+                manualControlEnabled = cmd.data.enable;
+                if (!manualControlEnabled) {
+                    setMotorSpeed(0, 0, false);
+                }
+            } else if (cmd.type == ManualControlCmdType::MotionCmd) {
+                DEBUG_LEVEL_1("Motion cmd rcvd: dir=%d, speed=%d", 
+                    cmd.data.motion.dir, cmd.data.motion.speed);
+                if (!manualControlEnabled) {
+                    // ignore
+                    continue;
+                }
+                switch (cmd.data.motion.dir) {
                     case MotionDir::Forward:
                         setMotorSpeed(230, 230, false);
                         break;
@@ -84,29 +88,7 @@ void manualControlTask(void *parameter) {
                         break;
                 }
             }
-
-        } else if (xActivatedMember == g_fsmNotifQueue[toIndex(TaskId::ManualControl)]) {
-            xQueueReceive(
-              g_fsmNotifQueue[toIndex(TaskId::ManualControl)], &notif_item, 0);
-            
-            DEBUG_LEVEL_2("notif from fsm rcvd by ManualControl");
-
-            switch (notif_item.type) {
-                case FsmNotifType::StateChanged:
-                    //DEBUG_LEVEL_1("IR beacon count: %d", count);
-                    if (notif_item.data.state == RobotState::ManualControl) {
-                        isManualControlMode = true;
-                    } else {
-                        // stop motors
-                        setMotorSpeed(0, 0, false);
-                        isManualControlMode = false;
-                    }
-                    break;
-                default:
-                    break;
-            } 
         }
-
     }
 }
 
@@ -145,4 +127,12 @@ bool stringToDir(const char* str, MotionDir& dir) {
         return true;
     }
     return false;
+}
+
+bool sendManualControlCmd(const ManualControlCmd& item) {
+    if (manualControlCmdQueue == nullptr) {
+        DEBUG_LEVEL_1("Manual control cmd queue not initialized");
+        return false;
+    }
+    return xQueueSend(manualControlCmdQueue, &item, 0) == pdPASS;
 }

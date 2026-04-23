@@ -6,4 +6,13 @@
 
 void initGameStatusTask();
 
+struct GameStatusCtrlCmd {
+    bool startGame; // true to start, false to stop
+    bool enableBtnEvent; 
+};
+bool sendGameStatusCtrlCmd(const GameStatusCtrlCmd& cmd);    // other -> fsm task
+
+
+
+
 #endif

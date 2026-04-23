@@ -5,8 +5,6 @@
 #include "FreeRTOS.h"
 #include "queue.h"
 
-extern QueueHandle_t g_manualControlQueue; // send for manual control task only
-
 void initManualControl();
 
 /* ---------- Manual Control ------------- */
@@ -21,15 +19,26 @@ enum class MotionDir {
     RotateCCW
 };
 
+enum class ManualControlCmdType {
+    CtrlCmd,
+    MotionCmd
+};
+
 struct ManualControlMotionData {
     MotionDir dir;
     int speed;
 };
 
-struct ManualControlMotionQueueItem {
-    ManualControlMotionData data;
+struct ManualControlCmd {
+    ManualControlCmdType type;
+    union {
+        bool enable; // for CtrlCmd
+        ManualControlMotionData motion; // for MotionCmd
+    } data;
 };
 
 bool stringToDir(const char* str, MotionDir& dir);
+
+bool sendManualControlCmd(const ManualControlCmd& item);
 
 #endif

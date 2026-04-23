@@ -5,12 +5,13 @@
 #include <stdint.h>
 #include "globals.h"
 
-TaskHandle_t irBeaconDetectTaskHandle = NULL;
-TimerHandle_t periodicReportTimerHandle = NULL; // report detected frequency periodically
+static TaskHandle_t irBeaconDetectTaskHandle = nullptr;
+static TimerHandle_t periodicReportTimerHandle = nullptr; // report detected frequency periodically
+static QueueHandle_t irBeaconDetectCmdQueue = nullptr; 
 void irBeaconDetectTask(void *parameter);
 void setupPCNT();
 int detectedFreq = 0;
-BeaconState beaconState = BeaconState::Unknown;
+static BeaconState beaconState = BeaconState::Unknown;
 
 hw_timer_t* irBeaconDetectTimer = nullptr; // used for a fixed period of timeout
 
@@ -30,15 +31,11 @@ void ARDUINO_ISR_ATTR onIrBeaconDetectTimeoutInterrupt() {
         newState = BeaconState::Beacon750;
     } else if (detectedFreq > 1400 && detectedFreq < 1600) {
         newState = BeaconState::Beacon1k5;
+    } else {
+        newState = BeaconState::Unknown;
     }
 
-    if (newState != beaconState) {
-        beaconState = newState;
-
-        ev.type = FsmEventType::IrBeaconChangeDetected;
-        ev.data.newBeaconState = beaconState;
-        BaseType_t ok = xQueueSendFromISR(g_fsmEventQueue, &ev, &xHigherPriorityTaskWoken);
-    }
+    beaconState = newState;
 
     pcnt_counter_pause(IR_BEACON_PCNT_UNIT);
     pcnt_counter_clear(IR_BEACON_PCNT_UNIT);
@@ -60,6 +57,11 @@ void initIrBeaconDetect() {
     timerAttachInterrupt(irBeaconDetectTimer, &onIrBeaconDetectTimeoutInterrupt);
     timerAlarm(irBeaconDetectTimer, IR_BEACON_DETECT_PERIOD_MS * 1000ULL, true, 0); // periodic timeout alarm
     timerStop(irBeaconDetectTimer);
+
+    irBeaconDetectCmdQueue = xQueueCreate(10, sizeof(IrBeaconDetectCtrlCmd));
+    if (irBeaconDetectCmdQueue == nullptr) {
+        DEBUG_LEVEL_1("Failed to create IrBeaconDetectCmdQueue.");
+    }
 
     // Create software timer for periodic report
     periodicReportTimerHandle = xTimerCreate( 
@@ -83,31 +85,24 @@ void initIrBeaconDetect() {
 
 
 void irBeaconDetectTask(void *parameter) {
-    FsmNotifQueueItem notif_item;
+    IrBeaconDetectCtrlCmd cmd;
 
     for (;;) {
         if (xQueueReceive(
-                g_fsmNotifQueue[toIndex(TaskId::IrBeaconDetector)], 
-                &notif_item, 
+                irBeaconDetectCmdQueue, 
+                &cmd, 
                 portMAX_DELAY) == pdPASS) {
             
-            DEBUG_LEVEL_2("notif from fsm rcvd by IrBeaconDetector");
+            DEBUG_LEVEL_2("Cmd rcvd by IrBeaconDetector");
 
-            switch (notif_item.type) {
-                case FsmNotifType::StateChanged:
-                    //DEBUG_LEVEL_1("IR beacon count: %d", count);
-                    if (notif_item.data.state == RobotState::CheckHillLoyalty) {
-                        timerStart(irBeaconDetectTimer);
-                        xTimerStart(periodicReportTimerHandle, 0);
-                    } else {
-                        // stop the timer
-                        timerStop(irBeaconDetectTimer);
-                        xTimerStop(periodicReportTimerHandle, 0);
-                    }
-                    break;
-                default:
-                    break;
+            if (cmd.queryBeaconState && g_fsmEventQueue != nullptr) {
+                // response with event
+                FsmEventQueueItem ev{};
+                ev.type = FsmEventType::IrBeaconQueryResponse;
+                ev.data.newBeaconState = beaconState;
+                xQueueSend(g_fsmEventQueue, &ev, 0);
             }
+            
         }
 
     }
@@ -140,4 +135,12 @@ void setupPCNT() {
   pcnt_counter_pause(IR_BEACON_PCNT_UNIT);
   pcnt_counter_clear(IR_BEACON_PCNT_UNIT);
   pcnt_counter_resume(IR_BEACON_PCNT_UNIT);
+}
+
+bool sendIrBeaconDetectCtrlCmd(const IrBeaconDetectCtrlCmd& cmd) {
+    if (irBeaconDetectCmdQueue == nullptr) {
+        DEBUG_LEVEL_1("irBeaconDetectCmdQueue is not created");
+        return false;
+    }
+    return xQueueSend(irBeaconDetectCmdQueue, &cmd, 0) == pdPASS;
 }

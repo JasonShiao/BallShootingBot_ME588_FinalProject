@@ -6,13 +6,15 @@
 
 // declare
 void gameStatusTask(void *parameter);
-TaskHandle_t gameStatusTaskHandle = NULL;
+static TaskHandle_t gameStatusTaskHandle = nullptr;
+static QueueHandle_t gameStatusCmdQueue = nullptr; // other -> fsm task
 
 hw_timer_t* gameTimer = nullptr;
 static const uint32_t GAME_DURATION_MS = 150000; // 150000// 2min30s = 150s
 
-static volatile uint32_t lastStartIsr_us = 0; // for debounce
-volatile bool gameStarted = false;
+static volatile uint32_t lastStartBtnIsr_us = 0; // for debounce
+static volatile bool gameStarted = false;
+static volatile bool btnEventEnabled = false;
 
 
 void ARDUINO_ISR_ATTR onGameStartBtnInterrupt() {
@@ -20,10 +22,10 @@ void ARDUINO_ISR_ATTR onGameStartBtnInterrupt() {
 
     uint32_t now = micros();
 
-    if ((now - lastStartIsr_us) > 50000) {  // 50 ms debounce
-        lastStartIsr_us = now;
+    if ((now - lastStartBtnIsr_us) > 50000) {  // 50 ms debounce
+        lastStartBtnIsr_us = now;
 
-        if ((!gameStarted)) {
+        if (btnEventEnabled && g_fsmEventQueue != nullptr) {
             FsmEventQueueItem ev{};
             ev.type = FsmEventType::GameStartReq;
             ev.data.startPressed = true;
@@ -37,7 +39,7 @@ void ARDUINO_ISR_ATTR onGameStartBtnInterrupt() {
 void ARDUINO_ISR_ATTR onGameTimeoutInterrupt() {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
-    if (gameStarted) {
+    if (gameStarted && g_fsmEventQueue != nullptr) {
         FsmEventQueueItem ev{};
         ev.type = FsmEventType::GameTimeout;
         ev.data.startPressed = false;
@@ -70,6 +72,11 @@ void initGameStatusTask() {
     timerAlarm(gameTimer, GAME_DURATION_MS * 1000ULL, false, 0); // one-shot timeout alarm
     timerStop(gameTimer);
 
+    gameStatusCmdQueue = xQueueCreate(5, sizeof(GameStatusCtrlCmd));
+    if(gameStatusCmdQueue == nullptr) {
+        DEBUG_LEVEL_1("Game status cmd queue created failed");
+    }
+
     // create the Task
     xTaskCreatePinnedToCore(
         gameStatusTask,         // Task function
@@ -84,38 +91,37 @@ void initGameStatusTask() {
 
 
 void gameStatusTask(void *parameter) {
-    FsmNotifQueueItem notif_item;
+    GameStatusCtrlCmd cmd;
 
     for(;;) {
         if (xQueueReceive(
-                g_fsmNotifQueue[toIndex(TaskId::GameStatus)], 
-                &notif_item, 
+                gameStatusCmdQueue, 
+                &cmd, 
                 portMAX_DELAY) == pdPASS) {
 
-            DEBUG_LEVEL_2("notif from fsm rcvd by GameStatus");
+            DEBUG_LEVEL_2("Cmd rcvd by GameStatus");
 
-            switch (notif_item.type) {
-                case FsmNotifType::StateChanged:
-                    if (!gameStarted && isGameStartedState(notif_item.data.state)) { // idle -> active
-                        gameStarted = true;
-                        digitalWrite(GAME_STARTED_LED_PIN, HIGH);
-                        // reset and start timer
-                        timerRestart(gameTimer);
-                        timerStart(gameTimer);
-
-                        DEBUG_LEVEL_1("Game started.");
-                    } else if (gameStarted && !isGameStartedState(notif_item.data.state)) { // active -> idle
-                        gameStarted = false;
-                        digitalWrite(GAME_STARTED_LED_PIN, LOW);
-                        // stop timer in case
-                        timerStop(gameTimer);
-
-                        DEBUG_LEVEL_1("Game stopped / returned to IDLE.");
-                    }
-                    break;
-                default:
-                    break;
+            btnEventEnabled = cmd.enableBtnEvent;
+            if (cmd.startGame) {
+                gameStarted = true;
+                digitalWrite(GAME_STARTED_LED_PIN, HIGH);
+                // reset and start timer
+                timerRestart(gameTimer);
+                timerStart(gameTimer);
+            } else {
+                gameStarted = false;
+                digitalWrite(GAME_STARTED_LED_PIN, LOW);
+                // stop timer
+                timerStop(gameTimer);
             }
+
         }
     }
+}
+
+bool sendGameStatusCtrlCmd(const GameStatusCtrlCmd& cmd) {
+    if (gameStatusCmdQueue == nullptr) {
+        return false;
+    }
+    return xQueueSend(gameStatusCmdQueue, &cmd, 0) == pdPASS;
 }

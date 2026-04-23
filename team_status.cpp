@@ -12,14 +12,14 @@
 
 // declare
 void teamStatusTask(void *parameter);
-TaskHandle_t teamStatusTaskHandle = NULL;
+static TaskHandle_t teamStatusTaskHandle = nullptr;
+static xQueueHandle_t teamStatusCmdQueue = nullptr; // other -> fsm task
 
 Adafruit_NeoPixel pixels(NUMPIXELS, NeoPixel_PIN, NEO_GRB + NEO_KHZ800);
 
 static volatile uint32_t lastBtnIsr_us = 0; // for debounce
-// keep a copy of state inside (might be older then latest fsm state for a short time)
-static volatile RobotState currState = RobotState::Idle; 
-static RobotTeam currTeam = RobotTeam::Red;
+static RobotTeam currTeam = RobotTeam::Red; // default team
+static bool btnEventEnabled = true; 
 
 
 void ARDUINO_ISR_ATTR onTeamSwitchBtnInterrupt() {
@@ -29,7 +29,7 @@ void ARDUINO_ISR_ATTR onTeamSwitchBtnInterrupt() {
     if ((now - lastBtnIsr_us) > 50000) {  // 50 ms debounce
         lastBtnIsr_us = now;
         
-        if (currState == RobotState::Idle) {
+        if (btnEventEnabled && teamStatusCmdQueue != nullptr) {
             // Send team change to queue
             FsmEventQueueItem ev{};
             ev.type = FsmEventType::TeamChangeReq;
@@ -61,6 +61,11 @@ void initTeamStatusTask() {
     }
     pixels.show(); 
 
+    teamStatusCmdQueue = xQueueCreate(5, sizeof(TeamStatusCtrlCmd));
+    if (teamStatusCmdQueue == nullptr) {
+        DEBUG_LEVEL_1("TeamStatusCmdQueue creation failed");
+    }
+
     xTaskCreatePinnedToCore(
         teamStatusTask,         // Task function
         "TeamStatusTask",       // Task name
@@ -74,39 +79,39 @@ void initTeamStatusTask() {
 }
 
 void teamStatusTask(void *parameter) {
-    FsmNotifQueueItem notif_item;
+    TeamStatusCtrlCmd cmd_item;
 
     for (;;) { // Infinite loop
         if (xQueueReceive(
-                g_fsmNotifQueue[toIndex(TaskId::TeamStatus)], 
-                &notif_item, 
+                teamStatusCmdQueue, 
+                &cmd_item, 
                 portMAX_DELAY) == pdPASS) {
         
-            DEBUG_LEVEL_2("notif from fsm rcvd by TeamStatus");
+            DEBUG_LEVEL_2("Cmd rcvd by TeamStatus");
 
-            switch (notif_item.type) {
-                case FsmNotifType::TeamChanged:
-                    if (notif_item.data.team == RobotTeam::Red) {
-                        pixels.clear();
-                        pixels.setPixelColor(0, pixels.Color(150, 0, 0));
-                        pixels.show();   // Send the updated pixel colors to the hardware.
-                        
-                        DEBUG_LEVEL_1("Team RED");
-                    } else {
-                        pixels.clear();
-                        pixels.setPixelColor(0, pixels.Color(0, 0, 150));
-                        pixels.show();   // Send the updated pixel colors to the hardware.
+            if (cmd_item.team != currTeam) {
+                currTeam = cmd_item.team;
+                if (cmd_item.team == RobotTeam::Red) {
+                    pixels.clear();
+                    pixels.setPixelColor(0, pixels.Color(150, 0, 0));
+                    pixels.show();   // Send the updated pixel colors to the hardware.
+                    
+                    DEBUG_LEVEL_1("Team RED");
+                } else {
+                    pixels.clear();
+                    pixels.setPixelColor(0, pixels.Color(0, 0, 150));
+                    pixels.show();   // Send the updated pixel colors to the hardware.
 
-                        DEBUG_LEVEL_1("Team BLUE");
-                    }
-                    currTeam = notif_item.data.team;
-                    break;
-                case FsmNotifType::StateChanged:
-                    currState = notif_item.data.state;
-                    break;
-                default:
-                    break;
+                    DEBUG_LEVEL_1("Team BLUE");
+                }
             }
         }
     }
+}
+
+bool sendTeamStatusCtrlCmd(const TeamStatusCtrlCmd& cmd) {
+    if (teamStatusCmdQueue == nullptr) {
+        return false;
+    }
+    return xQueueSend(teamStatusCmdQueue, &cmd, 0) == pdPASS;
 }

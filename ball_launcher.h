@@ -9,4 +9,16 @@
 
 void initBallLauncherTask();
 
+enum class BallLauncherCtrlCmdType {
+    Loadball,
+    Shoot,
+    Stop
+};
+
+struct BallLauncherCtrlCmd {
+    BallLauncherCtrlCmdType type;
+};
+
+bool sendBallLauncherCtrlCmd(const BallLauncherCtrlCmd& cmd);
+
 #endif

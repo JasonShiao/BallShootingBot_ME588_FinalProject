@@ -12,7 +12,8 @@
 bool parseInt(const char* str, int& out);
 
 void userIntefaceTask(void *parameter);
-TaskHandle_t userInterfaceTaskHandle = NULL;
+static TaskHandle_t userInterfaceTaskHandle = nullptr;
+static QueueHandle_t userInterfaceUpdateQueue = nullptr; // for receiving update from FSM task
 
 // ============================
 // Shared app state
@@ -62,6 +63,12 @@ void initUserInterface() {
 #endif
     setupWebServer();
 
+    userInterfaceUpdateQueue = xQueueCreate(
+        10, sizeof(UserInterfaceUpdateMsg));
+    if (userInterfaceUpdateQueue == nullptr) {
+        DEBUG_LEVEL_1("User Interface update queue creation failed");
+    }
+
     xTaskCreatePinnedToCore(
         userIntefaceTask,      // Task function
         "UserIntefaceTask",    // Task name
@@ -75,33 +82,27 @@ void initUserInterface() {
 
 void userIntefaceTask(void *parameter) {
     char rcvdChar;
-    FsmNotifQueueItem notif_item;
+    UserInterfaceUpdateMsg uiUpdateMsg;
 
     for (;;) {
         // Receive status update from FSM, update web server
         if (xQueueReceive(
-                g_fsmNotifQueue[toIndex(TaskId::UserInterface)], 
-                &notif_item, 
+                userInterfaceUpdateQueue, 
+                &uiUpdateMsg, 
                 0) == pdPASS) {
 
-            DEBUG_LEVEL_2("notif from fsm rcvd by UserInterface");
+            DEBUG_LEVEL_2("Update msg rcvd by UserInterface");
 
-            switch (notif_item.type) {
-                case FsmNotifType::StateChanged:
-                    if (appState.currentState != notif_item.data.state) {
-                        appendTransition(appState.currentState, notif_item.data.state, "");
-                    }
-                    break;
-                case FsmNotifType::TeamChanged:
-                    appState.team = notif_item.data.team;
-                    pushTeamUpdateToClients(appState.team);
-                    break;
-                case FsmNotifType::BeaconChanged:
-                    appState.currentBeaconState = notif_item.data.beacon;
-                    pushBeaconUpdateToClients(appState.currentBeaconState);
-                    break;
-                default:
-                    break;
+            if (uiUpdateMsg.currentState != appState.currentState) {
+                appendTransition(appState.currentState, uiUpdateMsg.currentState, "FSM update");
+            }
+            if (uiUpdateMsg.team != appState.team) {
+                appState.team = uiUpdateMsg.team;
+                pushTeamUpdateToClients(appState.team);
+            }
+            if (uiUpdateMsg.currentBeaconState != appState.currentBeaconState) {
+                appState.currentBeaconState = uiUpdateMsg.currentBeaconState;
+                pushBeaconUpdateToClients(appState.currentBeaconState);
             }
         }
         // Receive req from serial port
@@ -280,11 +281,11 @@ void setupWebServer() {
         }
 
         // Send ManualControlMotion item to Manual Control task
-        ManualControlMotionQueueItem motionCmd{};
-        motionCmd.data.dir = newDir;
-        motionCmd.data.speed = newSpeed;
-        BaseType_t ok = xQueueSend(g_manualControlQueue, &motionCmd, 0);
-        if (ok == pdPASS) {
+        ManualControlCmd cmd{};
+        cmd.type = ManualControlCmdType::MotionCmd;
+        cmd.data.motion.dir = newDir;
+        cmd.data.motion.speed = newSpeed;
+        if (sendManualControlCmd(cmd);) {
             request->send(200, "text/plain", "Motion command accepted");
         } else {
             request->send(500, "text/plain", "Command queue full");
@@ -428,4 +429,11 @@ bool parseInt(const char* str, int& out) {
 
     out = (int)val;
     return true;
+}
+
+bool sendUserInterfaceUpdate(const UserInterfaceUpdateMsg& msg) {
+    if (userInterfaceUpdateQueue == nullptr) {
+        return false;
+    }
+    return xQueueSend(userInterfaceUpdateQueue, &msg, 0) == pdPASS;
 }

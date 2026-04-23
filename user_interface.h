@@ -3,4 +3,12 @@
 
 void initUserInterface();
 
+struct UserInterfaceUpdateMsg {
+    RobotState currentState;
+    RobotTeam team;
+    BeaconState currentBeaconState;
+};
+
+bool sendUserInterfaceUpdate(const UserInterfaceUpdateMsg& msg);
+
 #endif
