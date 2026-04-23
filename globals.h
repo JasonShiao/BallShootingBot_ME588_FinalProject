@@ -69,9 +69,10 @@ enum class FsmEventType {
     GameStartReq,
     GameTimeout,
     TeamChangeReq,
+    BallLoaded,
     BallLaunched,
     BucketEmptyDetected,
-    IrBeaconChangeDetected,
+    IrBeaconQueryResponse,
     UserStateChangeReq
 };
 
@@ -87,6 +88,7 @@ struct FsmEventQueueItem {
     union {
         bool startPressed;
         bool teamChanged;
+        bool ballLoaded;
         bool ballLaunched;
         RobotState newState;
         BeaconState newBeaconState;

@@ -9,7 +9,7 @@ void initIrBeaconDetect();
 
 struct IrBeaconDetectCtrlCmd {
     bool queryBeaconState;
-}
+};
 
 bool sendIrBeaconDetectCtrlCmd(const IrBeaconDetectCtrlCmd& cmd);
 

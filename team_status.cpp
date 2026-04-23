@@ -13,7 +13,7 @@
 // declare
 void teamStatusTask(void *parameter);
 static TaskHandle_t teamStatusTaskHandle = nullptr;
-static xQueueHandle_t teamStatusCmdQueue = nullptr; // other -> fsm task
+static QueueHandle_t teamStatusCmdQueue = nullptr; // other -> fsm task
 
 Adafruit_NeoPixel pixels(NUMPIXELS, NeoPixel_PIN, NEO_GRB + NEO_KHZ800);
 

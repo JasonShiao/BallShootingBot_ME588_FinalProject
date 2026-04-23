@@ -285,7 +285,7 @@ void setupWebServer() {
         cmd.type = ManualControlCmdType::MotionCmd;
         cmd.data.motion.dir = newDir;
         cmd.data.motion.speed = newSpeed;
-        if (sendManualControlCmd(cmd);) {
+        if (sendManualControlCmd(cmd)) {
             request->send(200, "text/plain", "Motion command accepted");
         } else {
             request->send(500, "text/plain", "Command queue full");
