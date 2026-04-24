@@ -25,11 +25,11 @@ void ARDUINO_ISR_ATTR onGameStartBtnInterrupt() {
     if ((now - lastStartBtnIsr_us) > 50000) {  // 50 ms debounce
         lastStartBtnIsr_us = now;
 
-        if (btnEventEnabled && g_fsmEventQueue != nullptr) {
+        if (btnEventEnabled) {
             FsmEventQueueItem ev{};
             ev.type = FsmEventType::GameStartReq;
             ev.data.startPressed = true;
-            BaseType_t ok = xQueueSendFromISR(g_fsmEventQueue, &ev, &xHigherPriorityTaskWoken);
+            BaseType_t ok = sendFsmEventItemFromISR(ev, xHigherPriorityTaskWoken);
         }
     }
     
@@ -39,11 +39,11 @@ void ARDUINO_ISR_ATTR onGameStartBtnInterrupt() {
 void ARDUINO_ISR_ATTR onGameTimeoutInterrupt() {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
-    if (gameStarted && g_fsmEventQueue != nullptr) {
+    if (gameStarted) {
         FsmEventQueueItem ev{};
         ev.type = FsmEventType::GameTimeout;
         ev.data.startPressed = false;
-        BaseType_t ok = xQueueSendFromISR(g_fsmEventQueue, &ev, &xHigherPriorityTaskWoken);
+        BaseType_t ok = sendFsmEventItemFromISR(ev, xHigherPriorityTaskWoken);
     }
 
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);

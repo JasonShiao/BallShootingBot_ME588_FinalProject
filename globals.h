@@ -12,6 +12,7 @@ constexpr size_t EVENT_QUEUE_SIZE = 20;
 
 // -----------------------
 enum class RobotState {
+    Startup,
     Idle,
     MoveToNextJunction,
     CheckHillLoyalty,
@@ -49,6 +50,7 @@ const char* beaconStateToString(BeaconState s);
 
 /* ---------- Event (request) sent from other to FSM task ------------- */
 enum class FsmEventType {
+    StartupDone,
     GameStartReq,
     TeamChangeReq,
     GameTimeout,
@@ -81,6 +83,11 @@ struct FsmEventQueueItem {
 
 void initQueues();
 
+bool sendFsmEventItem(const FsmEventQueueItem& ev);
+bool sendFsmEventItemFromISR(
+    const FsmEventQueueItem& ev, BaseType_t& xHigherPriorityTaskWoken);
+BaseType_t receiveFsmEventItem(
+    FsmEventQueueItem& ev, TickType_t xTicksToWait);
 
 
 #endif

@@ -30,7 +30,7 @@ void onBallLaunchTimeoutCallback(TimerHandle_t xTimer) {
         FsmEventQueueItem ev{};
         ev.type = FsmEventType::BallLaunched;
         ev.data.ballLaunched = true;
-        BaseType_t ok = xQueueSend(g_fsmEventQueue, &ev, 0);
+        BaseType_t ok = sendFsmEventItem(ev);
         if (ok != pdPASS) {
             // queue full, handle error if needed
         }
@@ -109,7 +109,7 @@ void ballLauncherTask(void *parameter) {
                         FsmEventQueueItem ev{};
                         ev.type = FsmEventType::BallLoaded;
                         ev.data.ballLoaded = true;
-                        BaseType_t ok = xQueueSend(g_fsmEventQueue, &ev, 0);
+                        BaseType_t ok = sendFsmEventItem(ev);
 
                         DEBUG_LEVEL_1("Ball loaded.");
                         break;
@@ -125,7 +125,7 @@ void ballLauncherTask(void *parameter) {
                         FsmEventQueueItem ev{};
                         ev.type = FsmEventType::BallLoaded;
                         ev.data.ballLoaded = true;
-                        BaseType_t ok = xQueueSend(g_fsmEventQueue, &ev, 0);
+                        BaseType_t ok = sendFsmEventItem(ev);
 
                         DEBUG_LEVEL_1("Ball loaded.");
                     } else {
@@ -135,7 +135,7 @@ void ballLauncherTask(void *parameter) {
                         FsmEventQueueItem ev{};
                         ev.type = FsmEventType::BucketEmptyDetected;
                         ev.data.ballLoaded = false;
-                        BaseType_t ok = xQueueSend(g_fsmEventQueue, &ev, 0);
+                        BaseType_t ok = sendFsmEventItem(ev);
 
                         DEBUG_LEVEL_1("Bucket empty. Not launching ball.");
                     }

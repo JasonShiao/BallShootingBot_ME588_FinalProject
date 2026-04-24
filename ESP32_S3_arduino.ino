@@ -34,7 +34,7 @@ void setup() {
   initUserInterface();
 #endif
   
-  initFsmTask();
+  initFsmTask(); // WARNING: Fsm MUST be the last init
 }
 
 void loop() {

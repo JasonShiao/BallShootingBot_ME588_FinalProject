@@ -198,6 +198,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     <h2>Force New State</h2>
     <div class="row">
       <select id="stateSelect">
+        <option value="Startup">Startup</option>
         <option value="Idle">Idle</option>
         <option value="MoveToNextJunction">MoveToNextJunction</option>
         <option value="CheckHillLoyalty">CheckHillLoyalty</option>

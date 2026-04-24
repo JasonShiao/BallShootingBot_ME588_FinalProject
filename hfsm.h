@@ -8,6 +8,8 @@ class RobotFSM {
 public:
     RobotFSM();
 
+    void begin(); // startup
+
     void dispatch(const FsmEventQueueItem& ev);
     void transitionTo(RobotState next, const FsmEventQueueItem* ev);
 

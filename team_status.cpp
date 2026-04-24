@@ -33,7 +33,7 @@ void ARDUINO_ISR_ATTR onTeamSwitchBtnInterrupt() {
             FsmEventQueueItem ev{};
             ev.type = FsmEventType::TeamChangeReq;
             ev.data.teamChanged = true;
-            BaseType_t ok = xQueueSendFromISR(g_fsmEventQueue, &ev, &xHigherPriorityTaskWoken);
+            BaseType_t ok = sendFsmEventItemFromISR(ev, xHigherPriorityTaskWoken);
         }
     }
     

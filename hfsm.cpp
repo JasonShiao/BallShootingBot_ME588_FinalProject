@@ -51,9 +51,21 @@ static int buildPathToRoot(const State* s, const State* path[], int maxDepth) {
 
 
 RobotFSM::RobotFSM()
-    : current_(stateFromId(RobotState::Idle))
+    : current_(stateFromId(RobotState::Startup))
 {
 }
+
+void RobotFSM::begin() {
+    current_ = stateFromId(RobotState::Startup);
+
+    const State* path[8];
+    int n = buildPathToRoot(current_, path, 8);
+
+    for (int k = n - 1; k >= 0; --k) {
+        path[k]->onEnter(*this, nullptr);
+    }
+}
+
 
 /**
  *  Process an event by dispatching it to the current state and its hierarchy. 
@@ -127,11 +139,13 @@ void initFsmTask() {
 }
 
 void fsmTask(void *parameter) {
+    fsm.begin();
+
     FsmEventQueueItem ev{};
     UserInterfaceUpdateMsg uiUpdateCmd{};
 
     for (;;) {
-        if (xQueueReceive(g_fsmEventQueue, &ev, portMAX_DELAY) == pdPASS) {
+        if (receiveFsmEventItem(ev, portMAX_DELAY)) {
             DEBUG_LEVEL_2("FSM task rcvd a new event");
 
             RobotState oldState = fsm.getState();

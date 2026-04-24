@@ -29,7 +29,7 @@ struct TransitionRecord {
 static constexpr size_t LOG_CAPACITY = 200;
 
 struct AppState {
-    RobotState currentState = RobotState::Idle;
+    RobotState currentState = RobotState::Startup;
     RobotTeam team = RobotTeam::Red;
     BeaconState currentBeaconState = BeaconState::Unknown;
 
@@ -114,7 +114,7 @@ void userIntefaceTask(void *parameter) {
                 FsmEventQueueItem ev{};
                 ev.type = FsmEventType::UserStateChangeReq;
                 ev.data.newState = RobotState::BallLaunching;
-                BaseType_t ok = xQueueSend(g_fsmEventQueue, &ev, 0);
+                BaseType_t ok = sendFsmEventItem(ev);
             } else if (rcvdChar == 'w') {
                 Serial.println(WiFi.localIP());
             } else if (rcvdChar != '\n') {
@@ -243,7 +243,7 @@ void setupWebServer() {
         FsmEventQueueItem ev{};
         ev.type = FsmEventType::UserStateChangeReq;
         ev.data.newState = newState;
-        BaseType_t ok = xQueueSend(g_fsmEventQueue, &ev, 0);
+        BaseType_t ok = sendFsmEventItem(ev);
         if (ok == pdPASS) {
             request->send(200, "text/plain", "State command accepted");
         } else {

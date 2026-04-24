@@ -35,10 +35,10 @@ void ARDUINO_ISR_ATTR onIrBeaconDetectTimeoutInterrupt() {
         newState = BeaconState::Unknown;
     }
 
-    if (newState != beaconState && g_fsmEventQueue != nullptr) {
+    if (newState != beaconState) {
         ev.type = FsmEventType::IrBeaconChangeDetected;
         ev.data.newBeaconState = newState;
-        xQueueSendFromISR(g_fsmEventQueue, &ev, &xHigherPriorityTaskWoken);
+        sendFsmEventItemFromISR(ev, xHigherPriorityTaskWoken);
     }
     beaconState = newState;
 
@@ -101,12 +101,12 @@ void irBeaconDetectTask(void *parameter) {
             
             DEBUG_LEVEL_2("Cmd rcvd by IrBeaconDetector");
 
-            if (cmd.queryBeaconState && g_fsmEventQueue != nullptr) {
+            if (cmd.queryBeaconState) {
                 // response with event
                 FsmEventQueueItem ev{};
                 ev.type = FsmEventType::IrBeaconQueryResponse;
                 ev.data.newBeaconState = beaconState;
-                xQueueSend(g_fsmEventQueue, &ev, 0);
+                sendFsmEventItem(ev);
             }
             
         }

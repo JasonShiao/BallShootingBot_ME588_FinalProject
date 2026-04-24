@@ -4,6 +4,23 @@
 // From other task -> fsm task
 QueueHandle_t g_fsmEventQueue = nullptr;
 
+bool sendFsmEventItem(const FsmEventQueueItem& ev) {
+    if (g_fsmEventQueue == nullptr) {
+        return false;
+    }
+    return xQueueSend(g_fsmEventQueue, &ev, 0) == pdPASS;
+}
+
+bool sendFsmEventItemFromISR(const FsmEventQueueItem& ev, 
+  BaseType_t& xHigherPriorityTaskWoken) {
+    return xQueueSendFromISR(g_fsmEventQueue, &ev, &xHigherPriorityTaskWoken);
+}
+
+BaseType_t receiveFsmEventItem(FsmEventQueueItem& ev, TickType_t xTicksToWait) {
+    return xQueueReceive(g_fsmEventQueue, &ev, xTicksToWait) == pdPASS;
+}
+
+
 void initQueues() {
     g_fsmEventQueue = xQueueCreate(EVENT_QUEUE_SIZE, sizeof(FsmEventQueueItem));
 
@@ -21,6 +38,10 @@ bool isOwnBeacon(RobotTeam team, BeaconState beacon) {
 
 
 bool stringToState(const char* str, RobotState& out) {
+    if (strcmp(str, "Startup") == 0) {
+        out = RobotState::Startup;
+        return true;
+    }
     if (strcmp(str, "Idle") == 0) {
         out = RobotState::Idle;
         return true;
@@ -79,6 +100,7 @@ const char* beaconStateToString(BeaconState s) {
 
 const char* eventToString(FsmEventType e) {
     switch (e) {
+        case FsmEventType::StartupDone:  return "StartupDone";
         case FsmEventType::GameStartReq: return "GameStartReq";
         case FsmEventType::GameTimeout:  return "GameTimeout";
         case FsmEventType::BallLoaded:   return "BallLoaded";

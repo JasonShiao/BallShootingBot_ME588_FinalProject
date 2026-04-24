@@ -105,6 +105,14 @@ class HillInteractionState : public GameActiveState {
 // |                                                                |
 // |                                                                |
 // ==================================================================
+class StartupState : public State {
+ public:
+    RobotState id() const override { return RobotState::Startup; }
+
+    EventResult handle(RobotFSM& fsm, const FsmEventQueueItem& ev) const override;
+    void onEnter(RobotFSM& fsm, const FsmEventQueueItem* ev) const override;
+    void onExit(RobotFSM& fsm, const FsmEventQueueItem* ev) const override;
+};
 
 class IdleState : public GameInactiveState {
   public:
@@ -217,24 +225,6 @@ class WaitBucketReloadState : public GameActiveState {
 };
 
 
-// Instantiate all concrete states
-// Inactive states
-// extern GameInactiveState g_gameInactiveState;
-// extern IdleState g_idleState;
-// extern ManualControlState g_manualControlState;
-// extern ErrorState g_errorState;
-// // Active states
-// extern GameActiveState g_gameActiveState;
-// extern WaitBucketReloadState g_waitBucketReloadState;
-// //    Navigation states
-// extern NavigationState g_navigationState;
-// extern MoveToNextJunctionState g_moveToNextJunctionState;
-// extern BackHomeState g_backHomeState;
-// //   Hill interaction states
-// extern HillInteractionState g_hillInteractionState;
-// extern CheckHillLoyaltyState g_checkHillLoyaltyState;
-// extern BallLoadingState g_ballLoadingState;
-// extern BallLaunchingState g_ballLaunchingState;
 const State* stateFromId(RobotState s);
 const State* parentOf(const State* s);
 const char* stateToString(RobotState id);

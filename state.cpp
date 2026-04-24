@@ -13,6 +13,7 @@
 #include "manual_control.h"
 #include "navigation.h"
 
+StartupState g_startupState;
 GameInactiveState g_gameInactiveState;
 IdleState g_idleState;
 ManualControlState g_manualControlState;
@@ -29,6 +30,41 @@ HillInteractionState g_hillInteractionState;
 CheckHillLoyaltyState g_checkHillLoyaltyState;
 BallLoadingState g_ballLoadingState;
 BallLaunchingState g_ballLaunchingState;
+
+
+EventResult StartupState::handle(RobotFSM& fsm, const FsmEventQueueItem& ev) const {
+    if (ev.type == FsmEventType::StartupDone) {
+        EventResult r = EventResult::transition(RobotState::Idle);
+        return r;
+    } else {
+        return EventResult::unhandled();
+    }
+}
+
+void StartupState::onEnter(RobotFSM& fsm, const FsmEventQueueItem* ev) const {
+    // send a StartupDone event to trigger transition to Idle 
+    FsmEventQueueItem evNext{};
+    evNext.type = FsmEventType::StartupDone;
+    sendFsmEventItem(evNext);
+}
+
+void StartupState::onExit(RobotFSM& fsm, const FsmEventQueueItem* ev) const {
+    // sync team status
+    TeamStatusCtrlCmd teamCmd{};
+    teamCmd.type = TeamStatusCtrlCmdType::TeamChange;
+    teamCmd.data.team = fsm.getTeam();
+    sendTeamStatusCtrlCmd(teamCmd);
+    teamCmd.type = TeamStatusCtrlCmdType::BtnEventEnableChange;
+    teamCmd.data.enableBtnEvent = true;
+    sendTeamStatusCtrlCmd(teamCmd);
+
+    // sync game status
+    GameStatusCtrlCmd gameCmd{};
+    gameCmd.enableBtnEvent = true;
+    gameCmd.startGame = false;
+
+    // .... If anything need to sync
+}
 
 
 EventResult GameInactiveState::handle(RobotFSM& fsm, const FsmEventQueueItem& ev) const {
@@ -244,6 +280,7 @@ struct StateMeta {
 static constexpr RobotState NoParent = RobotState::Unknown;
 
 const StateMeta stateTable[] = {
+    { RobotState::Startup,            &g_startupState,            NoParent,                    "Startup"},
     { RobotState::GameInactive,       &g_gameInactiveState,       NoParent,                    "GameInactive" },
     { RobotState::Idle,               &g_idleState,               RobotState::GameInactive,    "Idle" },
     { RobotState::ManualControl,      &g_manualControlState,      RobotState::GameInactive,    "ManualControl" },
