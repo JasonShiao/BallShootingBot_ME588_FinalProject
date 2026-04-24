@@ -9,6 +9,8 @@ struct UserInterfaceUpdateMsg {
     RobotState currentState;
     RobotTeam team;
     BeaconState currentBeaconState;
+    RobotHeading heading;
+    RobotLocation location;
 };
 
 bool sendUserInterfaceUpdate(const UserInterfaceUpdateMsg& msg);

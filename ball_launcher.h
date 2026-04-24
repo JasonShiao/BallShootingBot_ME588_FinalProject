@@ -12,7 +12,8 @@ void initBallLauncherTask();
 enum class BallLauncherCtrlCmdType {
     Loadball,
     Shoot,
-    Stop
+    StartBucketReload,
+    Stop,
 };
 
 struct BallLauncherCtrlCmd {

@@ -14,6 +14,7 @@ static uint16_t sensor_values[LINE_FOLLOWER_LINE_COUNT];
 void initLineFollower();
 //void initJunctionDetect();
 //#define QTR_1A_THRESHOLD_VAL 500
+volatile bool swappedHead = false; // swap the head of robot
 
 // ======== PID control ========
 static constexpr int LINE_POS_CENTER = 1500;   // 4-sensor QTR readLineBlack(): 0 ~ 3000
@@ -156,13 +157,19 @@ void pidControlTask(void *parameter) {
             activateLineFollower = cmd.activateLineFollower;
             if (cmd.activateLineFollower) {
                 DEBUG_LEVEL_1("Activate line follower");
+                swappedHead = cmd.headingSwapped;
+                // TODO: GPIO pin for selecting Line follower
+                //digitalWrite(....);
+
             } else {
+                // set motor speed to 0
+                setMotorSpeed(0, 0, 0);
                 DEBUG_LEVEL_1("Deactivate line follower");
             }
         }
 
         if (activateLineFollower) {
-            // TODO: PID line follower here
+            // PID line follower logic here
             const int position = static_cast<int>(filteredLinePos);
             const int error = LINE_POS_CENTER - position;
 
@@ -181,7 +188,9 @@ void pidControlTask(void *parameter) {
             leftCmd  = clampInt(leftCmd,  0, g_maxSpeedLeft);
             rightCmd = clampInt(rightCmd, 0, g_maxSpeedRight);
 
-            setMotorSpeed(leftCmd, rightCmd, false);
+            setMotorSpeed(leftCmd, rightCmd, swappedHead);
+        } else {
+
         }
         vTaskDelayUntil(&lastWakeTime, controlPeriod);
     }

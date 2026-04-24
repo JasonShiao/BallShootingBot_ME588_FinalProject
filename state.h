@@ -8,12 +8,6 @@ struct EventResult {
     RobotState nextState;
     bool requestTransition = false;
 
-    bool changeTeam = false;
-    RobotTeam nextTeam;
-
-    bool changeBeacon = false;
-    BeaconState nextBeacon = BeaconState::Unknown;
-
     // static helper functions work without an instance
     static EventResult unhandled() { return {}; }
 
@@ -95,7 +89,7 @@ class HillInteractionState : public GameActiveState {
 
     //EventResult handle(RobotFSM& fsm, const FsmEventQueueItem& ev) const override;
     void onEnter(RobotFSM& fsm, const FsmEventQueueItem* ev) const override;
-    void onExit(RobotFSM& fsm, const FsmEventQueueItem* ev) const override {}
+    void onExit(RobotFSM& fsm, const FsmEventQueueItem* ev) const override;
 };
 
 // ==================================================================
@@ -118,16 +112,10 @@ class IdleState : public GameInactiveState {
   public:
     RobotState id() const override { return RobotState::Idle; }
 
-    EventResult handle(RobotFSM& fsm, const FsmEventQueueItem& ev) const override {
-        if (ev.type == FsmEventType::GameStartReq) {
-            EventResult r = EventResult::transition(RobotState::MoveToNextJunction);
-            return r;
-        }
-        return EventResult::unhandled();
-    }
+    EventResult handle(RobotFSM& fsm, const FsmEventQueueItem& ev) const override;
 
-    void onEnter(RobotFSM& fsm, const FsmEventQueueItem* ev) const override {}
-    void onExit(RobotFSM& fsm, const FsmEventQueueItem* ev) const override {}
+    void onEnter(RobotFSM& fsm, const FsmEventQueueItem* ev) const override;
+    void onExit(RobotFSM& fsm, const FsmEventQueueItem* ev) const override;
 };
 
 class ManualControlState : public GameInactiveState {
@@ -159,10 +147,7 @@ class MoveToNextJunctionState : public NavigationState {
   public:
     RobotState id() const override { return RobotState::MoveToNextJunction; }
 
-    EventResult handle(RobotFSM& fsm, const FsmEventQueueItem& ev) const override {
-        // TODO: Junction detect event handling
-        return EventResult::unhandled();
-    }
+    EventResult handle(RobotFSM& fsm, const FsmEventQueueItem& ev) const override;
 
     void onEnter(RobotFSM& fsm, const FsmEventQueueItem* ev) const override;
     void onExit(RobotFSM& fsm, const FsmEventQueueItem* ev) const override;
@@ -172,10 +157,7 @@ class BackHomeState : public GameActiveState {
   public:
     RobotState id() const override { return RobotState::BackHome; }
 
-    EventResult handle(RobotFSM& fsm, const FsmEventQueueItem& ev) const override {
-        // TODO: Junction detect event handling
-        return EventResult::unhandled();
-    }
+    EventResult handle(RobotFSM& fsm, const FsmEventQueueItem& ev) const override;
 
     void onEnter(RobotFSM& fsm, const FsmEventQueueItem* ev) const override;
     void onExit(RobotFSM& fsm, const FsmEventQueueItem* ev) const override;
@@ -195,33 +177,30 @@ class BallLoadingState: public HillInteractionState {
  public:
     RobotState id() const override { return RobotState::BallLoading; }
 
+    EventResult handle(RobotFSM& fsm, const FsmEventQueueItem& ev) const override;
+
+    void onEnter(RobotFSM& fsm, const FsmEventQueueItem* ev) const override;
+    void onExit(RobotFSM& fsm, const FsmEventQueueItem* ev) const override;
 };
 
 class BallLaunchingState: public HillInteractionState {
  public:
-     RobotState id() const override { return RobotState::BallLaunching; }
+    RobotState id() const override { return RobotState::BallLaunching; }
 
+    EventResult handle(RobotFSM& fsm, const FsmEventQueueItem& ev) const override;
+
+    void onEnter(RobotFSM& fsm, const FsmEventQueueItem* ev) const override;
+    void onExit(RobotFSM& fsm, const FsmEventQueueItem* ev) const override;
 };
 
 class WaitBucketReloadState : public GameActiveState {
   public:
     RobotState id() const override { return RobotState::WaitBucketReload; }
 
-    EventResult handle(RobotFSM& fsm, const FsmEventQueueItem& ev) const override {
-        // TODO: wait for Ball reload timeout
-        DEBUG_LEVEL_1("In WaitBucketReload state, event handling not implemented yet");
-        return EventResult::unhandled();
-    }
+    EventResult handle(RobotFSM& fsm, const FsmEventQueueItem& ev) const override;
 
-    void onEnter(RobotFSM& fsm, const FsmEventQueueItem* ev) const override {
-        // Start a timer for ball reload timeout
-        DEBUG_LEVEL_1("In WaitBucketReload state, reload timeout timer not implemented yet");
-    }
-    void onExit(RobotFSM& fsm, const FsmEventQueueItem* ev) const override {
-        // TODO:
-        // Stop the timer if it's still running
-        DEBUG_LEVEL_1("In WaitBucketReload state, reload timeout timer not implemented yet");
-    }
+    void onEnter(RobotFSM& fsm, const FsmEventQueueItem* ev) const override;
+    void onExit(RobotFSM& fsm, const FsmEventQueueItem* ev) const override;
 };
 
 

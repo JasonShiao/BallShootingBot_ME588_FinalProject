@@ -25,6 +25,11 @@ public:
 
     void setBeacon(BeaconState b) { beacon_ = b; }
 
+    RobotLocation getLocation() { return location_; }
+    void setLocation(RobotLocation l) { location_ = l; }
+    RobotHeading getHeading() { return heading_; }
+    void setHeading(RobotHeading h) { heading_ = h; }
+
     // worker-command helpers
     // void sendGameStatus(bool start, bool enableBtn);
     // void sendNavigationEnable(bool enable);
@@ -45,6 +50,8 @@ private:
     const State* current_;
     RobotTeam team_ = RobotTeam::Red;
     BeaconState beacon_ = BeaconState::Unknown;
+    RobotLocation location_ = RobotLocation::Home;
+    RobotHeading heading_ = RobotHeading::Forward;
     int tryCnt_ = 0; // try count for any process
 };
 

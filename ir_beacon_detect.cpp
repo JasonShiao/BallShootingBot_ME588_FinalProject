@@ -102,7 +102,9 @@ void irBeaconDetectTask(void *parameter) {
             DEBUG_LEVEL_2("Cmd rcvd by IrBeaconDetector");
 
             if (cmd.queryBeaconState) {
+                // wait a while (~ 3 times of detect period)
                 // response with event
+                vTaskDelay(pdMS_TO_TICKS(IR_BEACON_DETECT_PERIOD_MS*3));
                 FsmEventQueueItem ev{};
                 ev.type = FsmEventType::IrBeaconQueryResponse;
                 ev.data.newBeaconState = beaconState;
@@ -154,13 +156,17 @@ bool sendIrBeaconDetectCtrlCmd(const IrBeaconDetectCtrlCmd& cmd) {
 void enableRealtimeIrBeaconDetect(bool enable_update, bool enable_report) {
      if (enable_update) {
         timerStart(irBeaconDetectTimer);
-        if (enable_report) {
-            xTimerStart(periodicReportTimerHandle, 0);
-        } else {
-            xTimerStop(periodicReportTimerHandle, 0);
+        if (periodicReportTimerHandle != nullptr) {
+            if (enable_report) {
+                xTimerStart(periodicReportTimerHandle, 0);
+            } else {
+                xTimerStop(periodicReportTimerHandle, 0);
+            }
         }
     } else {
         timerStop(irBeaconDetectTimer);
-        xTimerStop(periodicReportTimerHandle, 0);
+        if (periodicReportTimerHandle != nullptr) {
+            xTimerStop(periodicReportTimerHandle, 0);
+        }
     }
 }

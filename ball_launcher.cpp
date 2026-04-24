@@ -9,12 +9,15 @@ void ballLauncherTask(void *parameter);
 static TaskHandle_t ballLauncherTaskHandle = nullptr;
 static TimerHandle_t ballLauncherTimerHandle = nullptr;
 static QueueHandle_t ballLauncherCmdQueue = nullptr;
+static volatile BallLauncherCtrlCmdType currCmdType = BallLauncherCtrlCmdType::Stop;
 
 static const uint32_t BALL_LAUNCH_DURATION_MS = 3000; // 3s
+static const uint32_t BUCKET_RELOAD_LED_FLASH_PERIOD_MS = 500; // 0.5s
+static const uint32_t BUCKET_RELOAD_TIMER_CNT_MAX = 8;  // 8*0.5s=4s
+static uint32_t timeout_cnt = 0;
+
 Servo ballLoadServo;
 Servo ballShootServo;
-
-static volatile bool isLaunchingBall = false;
 
 int servoAngleToMicroseconds(int angle) {
     if (angle < 0) angle = 0;
@@ -26,7 +29,7 @@ int servoAngleToMicroseconds(int angle) {
 }
 
 void onBallLaunchTimeoutCallback(TimerHandle_t xTimer) {
-    if (isLaunchingBall) {
+    if (currCmdType == BallLauncherCtrlCmdType::Shoot) {
         FsmEventQueueItem ev{};
         ev.type = FsmEventType::BallLaunched;
         ev.data.ballLaunched = true;
@@ -34,6 +37,15 @@ void onBallLaunchTimeoutCallback(TimerHandle_t xTimer) {
         if (ok != pdPASS) {
             // queue full, handle error if needed
         }
+    } else if (currCmdType == BallLauncherCtrlCmdType::StartBucketReload) {
+        if (timeout_cnt >= BUCKET_RELOAD_TIMER_CNT_MAX) {
+            FsmEventQueueItem ev{};
+            ev.type = FsmEventType::BucketReloadTimeout;
+            ev.data.bucketReloaded = true;
+            BaseType_t ok = sendFsmEventItem(ev);
+        }
+        digitalWrite(SHOOTING_LED_PIN, timeout_cnt % 2);
+        timeout_cnt += 1;
     }
 }
 
@@ -60,7 +72,7 @@ void initBallLauncherTask() {
     ballLauncherTimerHandle = xTimerCreate( 
         "BallLauncherTimerHandle",
         pdMS_TO_TICKS(BALL_LAUNCH_DURATION_MS),
-        pdFALSE,
+        pdFALSE,     // single shot timer
         (void *) 0,
         onBallLaunchTimeoutCallback);
 
@@ -100,7 +112,6 @@ void ballLauncherTask(void *parameter) {
             switch (cmd.type) {
                 case BallLauncherCtrlCmdType::Loadball:
                     // stop shooting procedure timer in case it's still running
-                    isLaunchingBall = false;
                     digitalWrite(SHOOTING_LED_PIN, HIGH);
                     // 1. Detect ball first
                     if (digitalRead(BALL_BUCKET_SENSOR_PIN) == LOW) {
@@ -152,18 +163,19 @@ void ballLauncherTask(void *parameter) {
                     ballShootServo.writeMicroseconds(servoAngleToMicroseconds(0));
                     vTaskDelay(pdMS_TO_TICKS(500));
 
-                    isLaunchingBall = true;
-                    // start timer
+                    // set and start timer (one-shot)
+                    timeout_cnt = 0;
+                    vTimerSetReloadMode(ballLauncherTimerHandle, pdFALSE);
+                    xTimerChangePeriod(ballLauncherTimerHandle, 
+                        pdMS_TO_TICKS(BALL_LAUNCH_DURATION_MS), 0);
                     if (xTimerStart(ballLauncherTimerHandle, 0) != pdPASS) {
-                        // error handling
-                        DEBUG_LEVEL_1("[Error] Ball Launch timer start failed");
+                        // error ...
                     }
                     DEBUG_LEVEL_1("Ball should've been launched in the air. Wait for 3 sec...");
                     break;
                 case BallLauncherCtrlCmdType::Stop:
                     // stop shooting or loading procedure timer
                     digitalWrite(SHOOTING_LED_PIN, LOW);
-                    isLaunchingBall = false;
                     // stop timer in case
                     xTimerStop(ballLauncherTimerHandle, 0);
                     ballLoadServo.writeMicroseconds(servoAngleToMicroseconds(0));
@@ -171,9 +183,22 @@ void ballLauncherTask(void *parameter) {
 
                     DEBUG_LEVEL_1("Ball load/launch stopped.");
                     break;
+                case BallLauncherCtrlCmdType::StartBucketReload:
+                    digitalWrite(SHOOTING_LED_PIN, HIGH);
+                    // start a timer (autoreload periodic)
+                    timeout_cnt = 0;
+                    vTimerSetReloadMode(ballLauncherTimerHandle, pdTRUE);
+                    xTimerChangePeriod(ballLauncherTimerHandle, 
+                        pdMS_TO_TICKS(BUCKET_RELOAD_LED_FLASH_PERIOD_MS), 0);
+                    if (xTimerStart(ballLauncherTimerHandle, 0) != pdPASS) {
+                        // error ...
+                    }
+                    break;
                 default:
                     break;
             }
+
+            currCmdType = cmd.type;
         }
     }
 

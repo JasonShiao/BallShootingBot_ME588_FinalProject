@@ -78,14 +78,7 @@ void RobotFSM::dispatch(const FsmEventQueueItem& ev) {
         return;
     }
 
-    if (r.changeTeam) {
-        setTeam(r.nextTeam);
-    }
-
-    if (r.changeBeacon) {
-        setBeacon(r.nextBeacon);
-    }
-
+    // Transition state
     if (r.requestTransition) {
         transitionTo(r.nextState, &ev);
     }
@@ -151,16 +144,23 @@ void fsmTask(void *parameter) {
             RobotState oldState = fsm.getState();
             RobotTeam oldTeam = fsm.getTeam();
             BeaconState oldBeacon = fsm.getBeacon();
+            RobotLocation oldLocation = fsm.getLocation();
+            RobotHeading oldHeading = fsm.getHeading();
 
             fsm.dispatch(ev);
 
             if (oldState != fsm.getState() ||
                 oldTeam != fsm.getTeam() ||
-                oldBeacon != fsm.getBeacon()) {
+                oldBeacon != fsm.getBeacon() ||
+                oldLocation != fsm.getLocation() ||
+                oldHeading != fsm.getHeading()) {
 
                 uiUpdateCmd.currentState = fsm.getState();
                 uiUpdateCmd.team = fsm.getTeam();
                 uiUpdateCmd.currentBeaconState = fsm.getBeacon();
+                uiUpdateCmd.location = fsm.getLocation();
+                uiUpdateCmd.heading = fsm.getHeading();
+
                 sendUserInterfaceUpdate(uiUpdateCmd);
             }
         }

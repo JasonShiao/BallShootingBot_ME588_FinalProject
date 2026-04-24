@@ -32,6 +32,8 @@ struct AppState {
     RobotState currentState = RobotState::Startup;
     RobotTeam team = RobotTeam::Red;
     BeaconState currentBeaconState = BeaconState::Unknown;
+    RobotHeading heading = RobotHeading::Forward;
+    RobotLocation location = RobotLocation::Home;
 
     TransitionRecord log[LOG_CAPACITY];
     size_t logHead = 0;   // index of oldest entry
@@ -54,6 +56,8 @@ void pushStateUpdateToClients(RobotState state);
 void pushLogUpdateToClients(const TransitionRecord& rec);
 void pushTeamUpdateToClients(RobotTeam team);
 void pushBeaconUpdateToClients(BeaconState state);
+void pushLocationUpdateToClients(RobotLocation location);
+void pushHeadingUpdateToClients(RobotHeading head);
 
 void initUserInterface() {
     
@@ -105,6 +109,14 @@ void userIntefaceTask(void *parameter) {
                 appState.currentBeaconState = uiUpdateMsg.currentBeaconState;
                 pushBeaconUpdateToClients(appState.currentBeaconState);
             }
+            if (uiUpdateMsg.location != appState.location) {
+                appState.location = uiUpdateMsg.location;
+                pushLocationUpdateToClients(appState.location);
+            }
+            if (uiUpdateMsg.heading != appState.heading) {
+                appState.heading = uiUpdateMsg.heading;
+                pushHeadingUpdateToClients(appState.heading);
+            }
         }
         // Receive req from serial port
         if (Serial.available() > 0) {
@@ -117,6 +129,24 @@ void userIntefaceTask(void *parameter) {
                 BaseType_t ok = sendFsmEventItem(ev);
             } else if (rcvdChar == 'w') {
                 Serial.println(WiFi.localIP());
+            } else if (rcvdChar == 'l') { // manual trigger left juntion
+                FsmEventQueueItem ev{};
+                ev.type = FsmEventType::JunctionCrossed;
+                ev.data.junctionCrossed.left = true;
+                BaseType_t ok = sendFsmEventItem(ev);
+            } else if (rcvdChar == 'r') { // manual trigger right juntion
+                DEBUG_LEVEL_1("Fake junction on right sensor...");
+                FsmEventQueueItem ev{};
+                ev.type = FsmEventType::JunctionCrossed;
+                ev.data.junctionCrossed.right = true;
+                BaseType_t ok = sendFsmEventItem(ev);
+            } else if (rcvdChar == 'h') { // manual trigger left + right juntion
+                DEBUG_LEVEL_1("Fake junction on left sensor...");
+                FsmEventQueueItem ev{};
+                ev.type = FsmEventType::JunctionCrossed;
+                ev.data.junctionCrossed.left = true;
+                ev.data.junctionCrossed.right = true;
+                BaseType_t ok = sendFsmEventItem(ev);
             } else if (rcvdChar != '\n') {
               DEBUG_LEVEL_1("Rcvd: %c", rcvdChar);
             }
@@ -181,10 +211,12 @@ void setupWebServer() {
         off += snprintf(
             json + off,
             JSON_BUF_SIZE - off,
-            "{\"currentState\":\"%s\",\"currentTeam\":\"%s\",\"currentBeaconState\":\"%s\",\"log\":[",
+            "{\"currentState\":\"%s\",\"currentTeam\":\"%s\",\"currentBeaconState\":\"%s\",\"currentLocationState\":\"%s\",\"currentHeadingState\":\"%s\",\"log\":[",
             stateToString(appState.currentState),
             teamToString(appState.team),
-            beaconStateToString(appState.currentBeaconState)
+            beaconStateToString(appState.currentBeaconState),
+            locationToString(appState.location),
+            headingToString(appState.heading)
         );
 
         for (size_t i = 0; i < appState.logCount && off < JSON_BUF_SIZE; ++i) {
@@ -380,6 +412,19 @@ void pushTeamUpdateToClients(RobotTeam team) {
     snprintf(msg, sizeof(msg), "%s", teamToString(team));
     events.send(msg, "team", millis());
 }
+
+void pushLocationUpdateToClients(RobotLocation loc) {
+    char msg[32];
+    snprintf(msg, sizeof(msg), "%s", locationToString(loc));
+    events.send(msg, "location", millis());
+}
+
+void pushHeadingUpdateToClients(RobotHeading head) {
+    char msg[16];
+    snprintf(msg, sizeof(msg), "%s", headingToString(head));
+    events.send(msg, "heading", millis());
+}
+
 
 size_t getLogPhysicalIndex(size_t logicalIndex) {
     return (appState.logHead + logicalIndex) % LOG_CAPACITY;

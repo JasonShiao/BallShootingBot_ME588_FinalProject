@@ -103,6 +103,7 @@ const char* eventToString(FsmEventType e) {
         case FsmEventType::StartupDone:  return "StartupDone";
         case FsmEventType::GameStartReq: return "GameStartReq";
         case FsmEventType::GameTimeout:  return "GameTimeout";
+        case FsmEventType::JunctionCrossed: return "JunctionCrossed";
         case FsmEventType::BallLoaded:   return "BallLoaded";
         case FsmEventType::BallLaunched: return "BallLaunched";
         case FsmEventType::BucketEmptyDetected: return "BucketEmptyDetected";
@@ -114,3 +115,153 @@ const char* eventToString(FsmEventType e) {
         default: return "Unknown";
     }
 }
+
+const char* locationToString(RobotLocation location) {
+    switch (location) {
+        case RobotLocation::Home: return "Home";
+        case RobotLocation::HomeBorderCrossed1: return "HomeBorderCrossed1";
+        case RobotLocation::HomeBorderCrossed2: return "HomeBorderCrossed2";
+        case RobotLocation::HomeToJunction1: return "HomeToJunction1";
+        case RobotLocation::Junction1ToJunction2: return "Junction1ToJunction2";
+        case RobotLocation::Junction2ToJunction3: return "Junction2ToJunction3";
+        case RobotLocation::Junction3ToJunction4: return "Junction3ToJunction4";
+        case RobotLocation::Junction4ToRoadEnd: return "Junction4ToRoadEnd";
+        default:
+            return "Unknown";
+    }
+}
+
+const char* headingToString(RobotHeading head) {
+    switch (head) {
+        case RobotHeading::Forward: return "Forward";
+        case RobotHeading::Backward: return "Backward";
+        default:
+            return "Unknown";
+    }
+}
+
+RobotLocation determineNewLocation(
+  RobotLocation currLocation, RobotHeading heading, 
+  JunctionCrossedInfo junct, RobotTeam team) {
+
+    RobotLocation newLocation = currLocation;
+
+    if (heading == RobotHeading::Forward) {
+        switch (currLocation) {
+            case RobotLocation::Home:
+                if (junct.left && junct.right) {
+                    newLocation = RobotLocation::HomeToJunction1;
+                } else if (junct.left) {
+                    newLocation = RobotLocation::HomeBorderCrossed1;
+                } else if (junct.right) {
+                    newLocation = RobotLocation::HomeBorderCrossed2;
+                } else {
+                    DEBUG_LEVEL_1("Unexpected junction cross");
+                }
+                break;
+            case RobotLocation::HomeBorderCrossed1: // left sensor already outside home
+                if (junct.right) {
+                    newLocation = RobotLocation::HomeToJunction1;
+                }
+                break;
+            case RobotLocation::HomeBorderCrossed2: // right sensor already outside home
+                if (junct.left) {
+                    newLocation = RobotLocation::HomeToJunction1;
+                }
+                break;
+            case RobotLocation::HomeToJunction1:
+                if (junct.left && team == RobotTeam::Blue) {
+                    newLocation = RobotLocation::Junction1ToJunction2;
+                } else if (junct.right && team == RobotTeam::Red) {
+                    newLocation = RobotLocation::Junction1ToJunction2;
+                }
+                break;
+            case RobotLocation::Junction1ToJunction2:
+                if (junct.right && team == RobotTeam::Blue) {
+                    newLocation = RobotLocation::Junction2ToJunction3;
+                } else if (junct.left && team == RobotTeam::Red) {
+                    newLocation = RobotLocation::Junction2ToJunction3;
+                }
+                break;
+            case RobotLocation::Junction2ToJunction3:
+                if (junct.left && team == RobotTeam::Blue) {
+                    newLocation = RobotLocation::Junction3ToJunction4;
+                } else if (junct.right && team == RobotTeam::Red) {
+                    newLocation = RobotLocation::Junction3ToJunction4;
+                }
+                break;
+            case RobotLocation::Junction3ToJunction4:
+                if (junct.right && team == RobotTeam::Blue) {
+                    newLocation = RobotLocation::Junction4ToRoadEnd;
+                } else if (junct.left && team == RobotTeam::Red) {
+                    newLocation = RobotLocation::Junction4ToRoadEnd;
+                }
+                break;
+            case RobotLocation::Junction4ToRoadEnd:
+                DEBUG_LEVEL_1("Unexpected Junction Crossed after Road End");
+                break;
+            default:
+                DEBUG_LEVEL_1("Unexpected Robot Location");
+        }
+    } else { // backward
+        switch (currLocation) {
+            case RobotLocation::Home:
+                DEBUG_LEVEL_1("Unexpected junction cross before home");
+                break;
+            case RobotLocation::HomeBorderCrossed1: // left is outside home
+                if (junct.left) {
+                    newLocation = RobotLocation::Home;
+                }
+                break;
+            case RobotLocation::HomeBorderCrossed2:
+                if (junct.right) {
+                    newLocation = RobotLocation::Home;
+                }
+                break;
+            case RobotLocation::HomeToJunction1:
+                if (junct.left && junct.right) {
+                    newLocation = RobotLocation::Home;
+                } else if (junct.left) {
+                    newLocation = RobotLocation::HomeBorderCrossed2; // right is outside
+                } else if (junct.right) {
+                    newLocation = RobotLocation::HomeBorderCrossed1; // left is outside
+                } else {
+                    DEBUG_LEVEL_1("Unexpected junction cross");
+                }
+                break;
+            case RobotLocation::Junction1ToJunction2:
+                if (junct.left && team == RobotTeam::Blue) {
+                    newLocation = RobotLocation::HomeToJunction1;
+                } else if (junct.right && team == RobotTeam::Red) {
+                    newLocation = RobotLocation::HomeToJunction1;
+                }
+                break;
+            case RobotLocation::Junction2ToJunction3:
+                if (junct.right && team == RobotTeam::Blue) {
+                    newLocation = RobotLocation::Junction1ToJunction2;
+                } else if (junct.left && team == RobotTeam::Red) {
+                    newLocation = RobotLocation::Junction1ToJunction2;
+                }
+                break;
+            case RobotLocation::Junction3ToJunction4:
+                if (junct.left && team == RobotTeam::Blue) {
+                    newLocation = RobotLocation::Junction2ToJunction3;
+                } else if (junct.right && team == RobotTeam::Red) {
+                    newLocation = RobotLocation::Junction2ToJunction3;
+                }
+                break;
+            case RobotLocation::Junction4ToRoadEnd:
+                if (junct.right && team == RobotTeam::Blue) {
+                    newLocation = RobotLocation::Junction3ToJunction4;
+                } else if (junct.left && team == RobotTeam::Red) {
+                    newLocation = RobotLocation::Junction3ToJunction4;
+                }
+                break;
+            default:
+                DEBUG_LEVEL_1("Unexpected Robot Location");
+        }
+    }
+
+    return newLocation;
+}
+

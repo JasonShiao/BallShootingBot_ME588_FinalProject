@@ -34,8 +34,7 @@ BallLaunchingState g_ballLaunchingState;
 
 EventResult StartupState::handle(RobotFSM& fsm, const FsmEventQueueItem& ev) const {
     if (ev.type == FsmEventType::StartupDone) {
-        EventResult r = EventResult::transition(RobotState::Idle);
-        return r;
+        return EventResult::transition(RobotState::Idle);
     } else {
         return EventResult::unhandled();
     }
@@ -49,6 +48,15 @@ void StartupState::onEnter(RobotFSM& fsm, const FsmEventQueueItem* ev) const {
 }
 
 void StartupState::onExit(RobotFSM& fsm, const FsmEventQueueItem* ev) const {
+    // sync UI first
+    UserInterfaceUpdateMsg uiUpdateCmd{};
+    uiUpdateCmd.currentState = fsm.getState();
+    uiUpdateCmd.team = fsm.getTeam();
+    uiUpdateCmd.currentBeaconState = fsm.getBeacon();
+    uiUpdateCmd.location = fsm.getLocation();
+    uiUpdateCmd.heading = fsm.getHeading();
+    sendUserInterfaceUpdate(uiUpdateCmd);
+
     // sync team status
     TeamStatusCtrlCmd teamCmd{};
     teamCmd.type = TeamStatusCtrlCmdType::TeamChange;
@@ -69,23 +77,19 @@ void StartupState::onExit(RobotFSM& fsm, const FsmEventQueueItem* ev) const {
 
 EventResult GameInactiveState::handle(RobotFSM& fsm, const FsmEventQueueItem& ev) const {
     if (ev.type == FsmEventType::TeamChangeReq) {
-        EventResult r = EventResult::stayHandled();
-        r.changeTeam = true;
-        r.nextTeam = fsm.getOpponentTeam();
+        // toggle team
+        fsm.toggleTeam();
         // send to team status task
         TeamStatusCtrlCmd cmd{};
         cmd.type = TeamStatusCtrlCmdType::TeamChange;
-        cmd.data.team = r.nextTeam;
+        cmd.data.team = fsm.getTeam();
         sendTeamStatusCtrlCmd(cmd);
-        return r;
+        return EventResult::stayHandled();
     } else if (ev.type == FsmEventType::IrBeaconChangeDetected) {
-        EventResult r = EventResult::stayHandled();
-        r.changeBeacon = true;
-        r.nextBeacon = ev.data.newBeaconState;
-        return r;
+        fsm.setBeacon(ev.data.newBeaconState);
+        return EventResult::stayHandled();
     } else if (ev.type == FsmEventType::UserStateChangeReq) {
-        EventResult r = EventResult::transition(ev.data.newState);
-        return r;
+        return EventResult::transition(ev.data.newState);
     }
     return EventResult::unhandled();
 }
@@ -111,16 +115,12 @@ void GameInactiveState::onExit(RobotFSM& fsm, const FsmEventQueueItem* ev) const
 EventResult GameActiveState::handle(
   RobotFSM& fsm, const FsmEventQueueItem& ev) const {
     if (ev.type == FsmEventType::GameTimeout) {
-        EventResult r = EventResult::transition(RobotState::Idle);
-        return r;
+        return EventResult::transition(RobotState::Idle);
     } else if (ev.type == FsmEventType::IrBeaconChangeDetected) {
-        EventResult r = EventResult::stayHandled();
-        r.changeBeacon = true;
-        r.nextBeacon = ev.data.newBeaconState;
-        return r;
+        fsm.setBeacon(ev.data.newBeaconState);
+        return EventResult::stayHandled();
     } else if (ev.type == FsmEventType::UserStateChangeReq) {
-        EventResult r = EventResult::transition(ev.data.newState);
-        return r;
+        return EventResult::transition(ev.data.newState);
     }
     return EventResult::unhandled();
 }
@@ -144,10 +144,31 @@ void GameActiveState::onEnter(
 void GameActiveState::onExit(
   RobotFSM& fsm, const FsmEventQueueItem* ev) const {
 
+    // Reset location to home when exiting game activate state
+    fsm.setLocation(RobotLocation::Home);
+}
+
+EventResult IdleState::handle(RobotFSM& fsm, const FsmEventQueueItem& ev) const {
+    if (ev.type == FsmEventType::GameStartReq) {
+        return EventResult::transition(RobotState::MoveToNextJunction);
+    }
+    return EventResult::unhandled();
+}
+
+void IdleState::onEnter(RobotFSM& fsm, const FsmEventQueueItem* ev) const {
+
+}
+
+void IdleState::onExit(RobotFSM& fsm, const FsmEventQueueItem* ev) const {
+
 }
 
 void HillInteractionState::onEnter(RobotFSM& fsm, const FsmEventQueueItem* ev) const {
     fsm.resetTryCnt();
+}
+
+void HillInteractionState::onExit(RobotFSM& fsm, const FsmEventQueueItem* ev) const {
+
 }
 
 EventResult CheckHillLoyaltyState::handle(RobotFSM& fsm, const FsmEventQueueItem& ev) const {
@@ -162,24 +183,15 @@ EventResult CheckHillLoyaltyState::handle(RobotFSM& fsm, const FsmEventQueueItem
                 //  2. IR sensor signal blocked/interfered
                 if (fsm.incAndGetTryCnt() >= 4) {
                     // after retrying for 3 times, treat it as no hill and move on
-                    EventResult r = EventResult::transition(RobotState::MoveToNextJunction);
-                    if (fsm.getBeacon() != ev.data.newBeaconState) {
-                        r.changeBeacon = true;
-                        r.nextBeacon = newBeacon;
-                    }
-                    return r;
+                    fsm.setBeacon(newBeacon);
+                    return EventResult::transition(RobotState::MoveToNextJunction);
                 } else {
+                    fsm.setBeacon(newBeacon);
                     // retry without transition
                     IrBeaconDetectCtrlCmd irBeaconDetectCmd{};
                     irBeaconDetectCmd.queryBeaconState = true;
                     sendIrBeaconDetectCtrlCmd(irBeaconDetectCmd);
-
-                    EventResult r = EventResult::stayHandled();
-                    if (fsm.getBeacon() != ev.data.newBeaconState) {
-                        r.changeBeacon = true;
-                        r.nextBeacon = newBeacon;
-                    }
-                    return r;
+                    return EventResult::stayHandled();
                 }
             }
             case BeaconState::Beacon750:
@@ -193,12 +205,8 @@ EventResult CheckHillLoyaltyState::handle(RobotFSM& fsm, const FsmEventQueueItem
                     fsm.incAndGetTryCnt() >= 4) {
                     nextState = RobotState::MoveToNextJunction;
                 }
-                EventResult r = EventResult::transition(nextState);
-                if (fsm.getBeacon() != ev.data.newBeaconState) {
-                    r.changeBeacon = true;
-                    r.nextBeacon = newBeacon;
-                }
-                return r;
+                fsm.setBeacon(ev.data.newBeaconState);
+                return EventResult::transition(nextState);
             }
             default:
                 DEBUG_LEVEL_1("Invalid beacon state detected in CheckHillLoyaltyState");
@@ -221,6 +229,52 @@ void CheckHillLoyaltyState::onExit(
 
 }
 
+EventResult BallLoadingState::handle(
+  RobotFSM& fsm, const FsmEventQueueItem& ev) const {
+    if (ev.type == FsmEventType::BallLoaded) {
+        return EventResult::transition(RobotState::BallLaunching);
+    } else if (ev.type == FsmEventType::BucketEmptyDetected) {
+        return EventResult::transition(RobotState::BackHome);
+    }
+
+    return EventResult::unhandled();
+}
+
+void BallLoadingState::onEnter(
+  RobotFSM& fsm, const FsmEventQueueItem* ev) const {
+    BallLauncherCtrlCmd cmd{};
+    cmd.type = BallLauncherCtrlCmdType::Loadball;
+    sendBallLauncherCtrlCmd(cmd);
+}
+
+void BallLoadingState::onExit(
+  RobotFSM& fsm, const FsmEventQueueItem* ev) const {
+    BallLauncherCtrlCmd cmd{};
+    cmd.type = BallLauncherCtrlCmdType::Stop;
+    sendBallLauncherCtrlCmd(cmd);
+}
+
+EventResult BallLaunchingState::handle(
+  RobotFSM& fsm, const FsmEventQueueItem& ev) const {
+    if (ev.type == FsmEventType::BallLaunched) {
+        return EventResult::transition(RobotState::CheckHillLoyalty);
+    }
+
+    return EventResult::unhandled();
+}
+
+void BallLaunchingState::onEnter(RobotFSM& fsm, const FsmEventQueueItem* ev) const {
+    BallLauncherCtrlCmd cmd{};
+    cmd.type = BallLauncherCtrlCmdType::Shoot;
+    sendBallLauncherCtrlCmd(cmd);
+}
+
+void BallLaunchingState::onExit(RobotFSM& fsm, const FsmEventQueueItem* ev) const {
+    BallLauncherCtrlCmd cmd{};
+    cmd.type = BallLauncherCtrlCmdType::Stop;
+    sendBallLauncherCtrlCmd(cmd);
+}
+
 void ManualControlState::onEnter(
   RobotFSM& fsm, const FsmEventQueueItem* ev) const {
     ManualControlCmd manualControlCmd{};
@@ -237,37 +291,161 @@ void ManualControlState::onExit(
     sendManualControlCmd(manualControlCmd);
 }
 
+EventResult MoveToNextJunctionState::handle(
+  RobotFSM& fsm, const FsmEventQueueItem& ev) const {
+    // Junction detect event handling
+    if (ev.type == FsmEventType::JunctionCrossed) {
+        DEBUG_LEVEL_2("Junction Crossed ev rcvd in MoveToNextJunctionState");
+        RobotLocation newLocation = determineNewLocation(
+            fsm.getLocation(), fsm.getHeading(),
+            ev.data.junctionCrossed, fsm.getTeam());
+        if (newLocation == fsm.getLocation()) {
+            return EventResult::stayHandled();
+        }
+
+        // Candidate Hill location (may not exist, need to check IR beacon)
+        if ((newLocation == RobotLocation::HomeToJunction1 && 
+            fsm.getHeading() == RobotHeading::Backward) ||
+            newLocation == RobotLocation::Junction1ToJunction2 ||
+            newLocation == RobotLocation::Junction2ToJunction3 ||
+            newLocation == RobotLocation::Junction3ToJunction4 ||
+            newLocation == RobotLocation::Junction4ToRoadEnd) {
+            fsm.setLocation(newLocation);
+            return EventResult::transition(RobotState::CheckHillLoyalty);
+        }
+        // Non-hill location (e.g. Home), keep going (same direction)
+        fsm.setLocation(newLocation);
+        return EventResult::stayHandled();
+    }
+
+    return EventResult::unhandled();
+}
+
 void MoveToNextJunctionState::onEnter(
   RobotFSM& fsm, const FsmEventQueueItem* ev) const {
-    // TODO:
+    // Rules for determine new heading direction:
+    // 1. Restrict the robot inside the Hills boundary
+    // 2. If near Home, forward only
+    if (fsm.getLocation() == RobotLocation::HomeToJunction1) {
+        if (fsm.getHeading() != RobotHeading::Forward) {
+            // change to forward
+            fsm.setHeading(RobotHeading::Forward);
+        }
+    } else if (fsm.getLocation() == RobotLocation::Junction4ToRoadEnd) {
+        if (fsm.getHeading() != RobotHeading::Backward) {
+            // change to forward
+            fsm.setHeading(RobotHeading::Backward);
+        }
+    } else if (fsm.getLocation() == RobotLocation::Home ||
+                fsm.getLocation() == RobotLocation::HomeBorderCrossed1 ||
+                fsm.getLocation() == RobotLocation::HomeBorderCrossed2) {
+        // Forward only
+        if (fsm.getHeading() != RobotHeading::Forward) {
+            // change to forward
+            fsm.setHeading(RobotHeading::Forward);
+        }
+    }
+
+    // Activate line follower with combined (heading info & team info)
+    // For navigation subsystem:
+    //     Team Blue backward = Team Red forward
+    //     Team Blue forward = Team Red backward
     NavigationCmd navCmd{};
     navCmd.activateLineFollower = true;
+    if (fsm.getTeam() == RobotTeam::Red) {
+        navCmd.headingSwapped = (fsm.getHeading() == RobotHeading::Forward);
+    } else {
+        navCmd.headingSwapped = (fsm.getHeading() == RobotHeading::Backward);
+    }
     sendNavigationCmd(navCmd);
 }
 
 void MoveToNextJunctionState::onExit(
   RobotFSM& fsm, const FsmEventQueueItem* ev) const {
-    // TODO:
+
     NavigationCmd navCmd{};
     navCmd.activateLineFollower = false;
     sendNavigationCmd(navCmd);
 }
 
+EventResult BackHomeState::handle(
+  RobotFSM& fsm, const FsmEventQueueItem& ev) const {
+    // Wait junction detect event
+    if (ev.type == FsmEventType::JunctionCrossed) {
+        DEBUG_LEVEL_1("Junction Crossed ev rcvd in BackHomeState");
+
+        RobotLocation newLocation = determineNewLocation(
+            fsm.getLocation(), fsm.getHeading(),
+            ev.data.junctionCrossed, fsm.getTeam());
+        if (newLocation == fsm.getLocation()) {
+            return EventResult::stayHandled();
+        }
+
+        if (newLocation == RobotLocation::Home) {
+            fsm.setLocation(newLocation);
+            return EventResult::transition(RobotState::WaitBucketReload);
+        }
+        // Change location but keep in BackHome state
+        fsm.setLocation(newLocation);
+        return EventResult::stayHandled();
+    }
+
+    return EventResult::unhandled();
+}
+
 void BackHomeState::onEnter(
   RobotFSM& fsm, const FsmEventQueueItem* ev) const {
-    // TODO:
+    // Backward to home
+    fsm.setHeading(RobotHeading::Backward);
+
+    // Activate line follower with combined (heading info & team info)
+    // For navigation subsystem:
+    //     Team Blue backward = Team Red forward
+    //     Team Blue forward = Team Red backward
     NavigationCmd navCmd{};
     navCmd.activateLineFollower = true;
+    if (fsm.getTeam() == RobotTeam::Red) {
+        navCmd.headingSwapped = (fsm.getHeading() == RobotHeading::Forward);
+    } else {
+        navCmd.headingSwapped = (fsm.getHeading() == RobotHeading::Backward);
+    }
     sendNavigationCmd(navCmd);
 }
 
 void BackHomeState::onExit(
   RobotFSM& fsm, const FsmEventQueueItem* ev) const {
-    // TODO:
+
     NavigationCmd navCmd{};
     navCmd.activateLineFollower = false;
     sendNavigationCmd(navCmd);
 }
+
+EventResult WaitBucketReloadState::handle(
+  RobotFSM& fsm, const FsmEventQueueItem& ev) const {
+    // Wait for Ball reload timeout event
+    if (ev.type == FsmEventType::BucketReloadTimeout) {
+        // transit to move to next junction
+        return EventResult::transition(RobotState::MoveToNextJunction);
+    }
+    return EventResult::unhandled();
+}
+
+void WaitBucketReloadState::onEnter(
+  RobotFSM& fsm, const FsmEventQueueItem* ev) const {
+    // Start a timer for bucket reload timeout
+    BallLauncherCtrlCmd cmd{};
+    cmd.type = BallLauncherCtrlCmdType::StartBucketReload;
+    sendBallLauncherCtrlCmd(cmd);
+}
+
+void WaitBucketReloadState::onExit(
+  RobotFSM& fsm, const FsmEventQueueItem* ev) const {
+    // Stop the timer if it's still running
+    BallLauncherCtrlCmd cmd{};
+    cmd.type = BallLauncherCtrlCmdType::Stop;
+    sendBallLauncherCtrlCmd(cmd);
+}
+
 
 // ================== Helper Functions ==================
 struct StateMeta {

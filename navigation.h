@@ -21,6 +21,7 @@ uint16_t getLinePosition();
 // (for back home state / cross junction ...)
 struct NavigationCmd {
     bool activateLineFollower;
+    bool headingSwapped; // swap the head of robot
 };
 
 bool sendNavigationCmd(NavigationCmd cmd);

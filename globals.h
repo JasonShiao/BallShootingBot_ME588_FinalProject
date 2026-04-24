@@ -42,10 +42,28 @@ enum class BeaconState {
     Beacon1k5
 };
 
+enum class RobotLocation {
+    Home,               // sensor 1 and sensor 2 both at home
+    HomeBorderCrossed1, // sensor 1 side outside home
+    HomeBorderCrossed2, // sensor 2 side outside home
+    HomeToJunction1,
+    Junction1ToJunction2,
+    Junction2ToJunction3,
+    Junction3ToJunction4,
+    Junction4ToRoadEnd
+};
+
+enum class RobotHeading {
+    Forward, // leave home 
+    Backward // back home
+};
+
 bool isOwnBeacon(RobotTeam team, BeaconState beacon);
 bool stringToState(const char* str, RobotState& out);
 const char* teamToString(RobotTeam t);
 const char* beaconStateToString(BeaconState s);
+const char* locationToString(RobotLocation l);
+const char* headingToString(RobotHeading h);
 // -----------------------
 
 /* ---------- Event (request) sent from other to FSM task ------------- */
@@ -54,10 +72,11 @@ enum class FsmEventType {
     GameStartReq,
     TeamChangeReq,
     GameTimeout,
+    JunctionCrossed,
     BallLoaded,
     BallLaunched,
     BucketEmptyDetected,
-    BucketReloadTimeout,
+    BucketReloadTimeout,    // use a timeout directly for reload done
     IrBeaconChangeDetected, // automatically send
     IrBeaconQueryResponse,  // response to query 
     // === Special event below ===
@@ -65,6 +84,15 @@ enum class FsmEventType {
 };
 
 const char* eventToString(FsmEventType e);
+
+struct JunctionCrossedInfo {
+    bool left;
+    bool right;
+};
+
+RobotLocation determineNewLocation(
+  RobotLocation currLocation, RobotHeading heading, 
+  JunctionCrossedInfo junct, RobotTeam team);
 
 struct FsmEventQueueItem {
     FsmEventType type;
@@ -74,8 +102,10 @@ struct FsmEventQueueItem {
         bool teamChanged;
         bool ballLoaded;
         bool ballLaunched;
+        bool bucketReloaded;
         RobotState newState;
         BeaconState newBeaconState;
+        JunctionCrossedInfo junctionCrossed;
     } data;
 };
 

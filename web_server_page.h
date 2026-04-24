@@ -185,6 +185,16 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
         <div>Beacon</div>
         <div class="state-box" id="beaconState">Unknown</div>
       </div>
+
+      <div>
+        <div>Location</div>
+        <div class="state-box" id="locationState">Unknown</div>
+      </div>
+
+      <div>
+        <div>Heading</div>
+        <div class="state-box" id="headingState">Unknown</div>
+      </div>
     </div>
   </div>
 
@@ -253,6 +263,8 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     const logEl = document.getElementById("log");
     const teamStateEl = document.getElementById("teamState");
     const beaconStateEl = document.getElementById("beaconState");
+    const locationStateEl = document.getElementById("locationState");
+    const headingStateEl = document.getElementById("headingState");
     const sendBtn = document.getElementById("sendBtn");
     const stopBtn = document.getElementById("stopBtn");
     const stateSelect = document.getElementById("stateSelect");
@@ -345,6 +357,8 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
         currentStateEl.textContent = data.currentState;
         updateTeamUI(data.currentTeam);
         beaconStateEl.textContent = data.currentBeaconState;
+        locationStateEl.textContent = data.currentLocationState;
+        headingStateEl.textContent = data.currentHeadingState;
         logEl.innerHTML = "";
 
         for (const entry of data.log) {
@@ -432,6 +446,14 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     
     evtSource.addEventListener("beacon", (event) => {
       beaconStateEl.textContent = event.data;
+    });
+
+    evtSource.addEventListener("location", (event) => {
+      locationStateEl.textContent = event.data;
+    });
+
+    evtSource.addEventListener("heading", (event) => {
+      headingStateEl.textContent = event.data;
     });
 
     evtSource.addEventListener("log", (event) => {
