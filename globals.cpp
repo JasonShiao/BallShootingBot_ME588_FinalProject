@@ -1,79 +1,24 @@
 #include "globals.h"
 #include <Arduino.h>
 
-//QueueHandle_t g_fsmNotifQueue[NUM_TASK] = {nullptr}; // game_status, team_status
-
+// From other task -> fsm task
 QueueHandle_t g_fsmEventQueue = nullptr;
 
 void initQueues() {
     g_fsmEventQueue = xQueueCreate(EVENT_QUEUE_SIZE, sizeof(FsmEventQueueItem));
-
-    //for (size_t i = 0; i < NUM_TASK; ++i) {
-    //    g_fsmNotifQueue[i] = xQueueCreate(NOTIF_QUEUE_SIZE, sizeof(FsmNotifQueueItem));
-    //}
 
     if(g_fsmEventQueue == NULL) {
         /* One or more queues were not created successfully as there was not enough
            heap memory available. Handle the error here. */
         DEBUG_LEVEL_1("Fsm Event queue created failed");
     }
-
-    //for (int i = 0; i < NUM_TASK; i++) {
-    //    if (g_fsmNotifQueue[i] == NULL) {
-    //        DEBUG_LEVEL_1("Fsm Notif queue created failed");
-    //    }
-    //}
 }
 
-bool isGameStartedState(RobotState s) {
-    switch (s) {
-        case RobotState::Idle:
-            return false;
-        case RobotState::MoveToNextJunction:
-        case RobotState::CheckHillLoyalty:
-        case RobotState::BallLaunching:
-        case RobotState::WaitLoyaltyChange:
-        case RobotState::BackHome:
-        case RobotState::WaitBallReload:
-            return true;
-        // ====== Special states =====
-        case RobotState::ForceStopped:
-        case RobotState::ManualControl:
-        case RobotState::Error:
-            return false;
-        default:
-            return false;
-    }
+bool isOwnBeacon(RobotTeam team, BeaconState beacon) {
+    return (team == RobotTeam::Blue && beacon == BeaconState::Beacon750) ||
+           (team == RobotTeam::Red  && beacon == BeaconState::Beacon1k5);
 }
 
-/**
- * Moving (autonomously), i.e. Excluding manual control
- */
-bool isRobotMoving(RobotState s) {
-    switch (s) {
-        case RobotState::MoveToNextJunction:
-        case RobotState::BackHome:
-            return true;
-        default:
-            return false;
-    }
-}
-
-const char* stateToString(RobotState s) {
-    switch (s) {
-        case RobotState::Idle:            return "Idle";
-        case RobotState::MoveToNextJunction:   return "MoveToNextJunction";
-        case RobotState::CheckHillLoyalty:     return "CheckHillLoyalty";
-        case RobotState::BallLaunching:        return "BallLaunching";
-        case RobotState::WaitLoyaltyChange:    return "WaitLoyaltyChange";
-        case RobotState::BackHome:        return "BackHome";
-        case RobotState::WaitBallReload:  return "WaitBallReload";
-        case RobotState::ForceStopped:    return "ForceStopped";
-        case RobotState::ManualControl:   return "ManualControl";
-        case RobotState::Error:           return "Error";
-        default:                          return "Unknown";
-    }
-}
 
 bool stringToState(const char* str, RobotState& out) {
     if (strcmp(str, "Idle") == 0) {
@@ -88,24 +33,20 @@ bool stringToState(const char* str, RobotState& out) {
         out = RobotState::CheckHillLoyalty;
         return true;
     }
-    if (strcmp(str, "BallLaunching") == 0) {
-        out = RobotState::BallLaunching;
+    if (strcmp(str, "BallLoading") == 0) {
+        out = RobotState::BallLoading;
         return true;
     }
-    if (strcmp(str, "WaitLoyaltyChange") == 0) {
-        out = RobotState::WaitLoyaltyChange;
+    if (strcmp(str, "BallLaunching") == 0) {
+        out = RobotState::BallLaunching;
         return true;
     }
     if (strcmp(str, "BackHome") == 0) {
         out = RobotState::BackHome;
         return true;
     }
-    if (strcmp(str, "WaitBallReload") == 0) {
-        out = RobotState::WaitBallReload;
-        return true;
-    }
-    if (strcmp(str, "ForceStopped") == 0) {
-        out = RobotState::ForceStopped;
+    if (strcmp(str, "WaitBucketReload") == 0) {
+        out = RobotState::WaitBucketReload;
         return true;
     }
     if (strcmp(str, "ManualControl") == 0) {
@@ -133,5 +74,21 @@ const char* beaconStateToString(BeaconState s) {
         case BeaconState::Beacon750:     return "Beacon750";
         case BeaconState::Beacon1k5:     return "Beacon1k5";
         default:                         return "Unknown";
+    }
+}
+
+const char* eventToString(FsmEventType e) {
+    switch (e) {
+        case FsmEventType::GameStartReq: return "GameStartReq";
+        case FsmEventType::GameTimeout:  return "GameTimeout";
+        case FsmEventType::BallLoaded:   return "BallLoaded";
+        case FsmEventType::BallLaunched: return "BallLaunched";
+        case FsmEventType::BucketEmptyDetected: return "BucketEmptyDetected";
+        case FsmEventType::BucketReloadTimeout: return "BucketReloadTimeout";
+        case FsmEventType::IrBeaconChangeDetected: return "IrBeaconChangeDetected";
+        case FsmEventType::IrBeaconQueryResponse:  return "IrBeaconQueryResponse";
+        case FsmEventType::TeamChangeReq:  return "TeamChangeReq";
+        case FsmEventType::UserStateChangeReq: return "UserStateChangeReq";
+        default: return "Unknown";
     }
 }

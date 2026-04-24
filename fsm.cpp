@@ -1,3 +1,4 @@
+#if FLAT_FSM
 #include "fsm.h"
 #include <Arduino.h>
 #include "globals.h"
@@ -256,7 +257,7 @@ uint32_t determineStateTransition(
                 fsmChangeBitMask |= CHANGE_BEACON_BITMASK;
             }
             break;
-        case RobotState::WaitBallReload:
+        case RobotState::WaitBucketReload:
             // wait for ball reload timeout or user override
              if (ev.type == FsmEventType::GameTimeout) {
                 newStates.state = RobotState::Idle;
@@ -264,11 +265,11 @@ uint32_t determineStateTransition(
             } else if (ev.type == FsmEventType::UserStateChangeReq) {
                 newStates.state = ev.data.newState;
                 fsmChangeBitMask |= CHANGE_STATE_BITMASK;
-            } else if (ev.type == FsmEventType::BallReloadTimeout) {
+            } else if (ev.type == FsmEventType::BucketReloadTimeout) {
                 newStates.state = RobotState::MoveToNextJunction;
                 fsmChangeBitMask |= CHANGE_STATE_BITMASK;
             }
-            DEBUG_LEVEL_1("In WaitBallReload state, reload timeout timer not implemented yet");
+            DEBUG_LEVEL_1("In WaitBucketReload state, reload timeout timer not implemented yet");
             break;
         case RobotState::ForceStopped:
             newStates.state = RobotState::Idle;
@@ -347,7 +348,7 @@ void transitionToState(RobotFSM& fsm, RobotState newState, FsmEventQueueItem& ev
                     gameStatusCmd.enableBtnEvent = false;
                     sendGameStatusCtrlCmd(gameStatusCmd);
                     break;
-                case RobotState::WaitBallReload:
+                case RobotState::WaitBucketReload:
                     gameStatusCmd.startGame = true;
                     gameStatusCmd.enableBtnEvent = false;
                     sendGameStatusCtrlCmd(gameStatusCmd);
@@ -484,7 +485,7 @@ void transitionToState(RobotFSM& fsm, RobotState newState, FsmEventQueueItem& ev
                     break;
             }
             break;
-        case RobotState::WaitBallReload:
+        case RobotState::WaitBucketReload:
             switch (newState) {
                 case RobotState::Idle: // timeout
                     gameStatusCmd.startGame = false;
@@ -500,7 +501,7 @@ void transitionToState(RobotFSM& fsm, RobotState newState, FsmEventQueueItem& ev
                     ...
 #endif
                 default:
-                    DEBUG_LEVEL_1("[Error] Invalid state transition from WaitBallReload");
+                    DEBUG_LEVEL_1("[Error] Invalid state transition from WaitBucketReload");
                     break;
             }
             break;
@@ -565,7 +566,7 @@ void handleEventWithCurrentState(RobotFSM& fsm, FsmEventQueueItem& ev) {
             break;
         case RobotState::BackHome:
             break;
-        case RobotState::WaitBallReload:
+        case RobotState::WaitBucketReload:
             break;
         case RobotState::ForceStopped:
             break;
@@ -607,3 +608,5 @@ void RobotFSM::setBeacon(BeaconState newState) {
 BeaconState RobotFSM::getBeacon() {
     return _beacon;
 }
+
+#endif

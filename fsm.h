@@ -1,6 +1,8 @@
 #ifndef FSM_H
 #define FSM_H
 
+#if FLAT_FSM
+
 #include "globals.h"
 
 #define MAX_NOTIF_QUEUE_NUM 10
@@ -38,5 +40,6 @@ class RobotFSM {
 
 void initFsmTask();
 
+#endif
 
 #endif

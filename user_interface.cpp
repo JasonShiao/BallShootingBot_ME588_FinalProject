@@ -8,6 +8,7 @@
 #include "manual_control.h"
 
 #include "web_server_page.h"
+#include "hfsm.h"
 
 bool parseInt(const char* str, int& out);
 
@@ -295,8 +296,7 @@ void setupWebServer() {
     events.onConnect([](AsyncEventSourceClient* client) {
         client->send("connected", "hello", millis());
 
-        RobotState currentState = RobotState::Idle;
-        currentState = appState.currentState;
+        RobotState currentState = appState.currentState;
         
         client->send(stateToString(currentState), "state", millis());
     });

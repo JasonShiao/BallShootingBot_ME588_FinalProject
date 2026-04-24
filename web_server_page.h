@@ -201,11 +201,10 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
         <option value="Idle">Idle</option>
         <option value="MoveToNextJunction">MoveToNextJunction</option>
         <option value="CheckHillLoyalty">CheckHillLoyalty</option>
+        <option value="BallLoading">BallLoading</option>
         <option value="BallLaunching">BallLaunching</option>
-        <option value="WaitLoyaltyChange">WaitLoyaltyChange</option>
         <option value="BackHome">BackHome</option>
-        <option value="WaitBallReload">WaitBallReload</option>
-        <option value="ForceStopped">ForceStopped</option>
+        <option value="WaitBucketReload">WaitBucketReload</option>
         <option value="ManualControl">ManualControl</option>
         <option value="Error">Error</option>
       </select>
@@ -407,7 +406,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     });
 
     stopBtn.addEventListener("click", async () => {
-      await sendState("ForceStopped");
+      await sendState("Idle");
     });
 
     for (const id in motionBtnMap) {

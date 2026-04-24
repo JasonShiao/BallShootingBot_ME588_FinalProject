@@ -61,8 +61,6 @@ static int clampInt(int x, int lo, int hi) {
 }
 
 // ========= private variables ==========
-//static RobotState currState = RobotState::Idle;
-
 //static bool junctionDetect1 = false; // notify on falling edge
 //static bool junctionDetect2 = false; // notify on falling edge
 

@@ -17,6 +17,8 @@ void initNavigation();
 
 uint16_t getLinePosition();
 
+// TODO: add a new command for blindly forward for certain duration 
+// (for back home state / cross junction ...)
 struct NavigationCmd {
     bool activateLineFollower;
 };

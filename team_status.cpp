@@ -2,7 +2,6 @@
 #include "FreeRTOS.h"
 #include <Adafruit_NeoPixel.h>
 #include <Arduino.h>
-#include "fsm.h"
 #include "queue.h"
 #include "globals.h"
 

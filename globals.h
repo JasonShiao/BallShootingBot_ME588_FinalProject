@@ -7,42 +7,27 @@
 #include "config.h"
 #include <Arduino.h>
 
-enum class TaskId {
-  GameStatus = 0,
-  TeamStatus,
-  BallLauncher,
-  IrBeaconDetector,
-#ifndef FULLY_AUTONOMOUS
-  UserInterface,
-  ManualControl,
-#endif
-  Count
-};
-
-constexpr size_t NUM_TASK =
-    static_cast<size_t>(TaskId::Count);
-
-constexpr size_t toIndex(TaskId id) {
-    return static_cast<size_t>(id);
-}
 
 constexpr size_t EVENT_QUEUE_SIZE = 20;
-constexpr size_t NOTIF_QUEUE_SIZE = 10;
-//extern QueueHandle_t g_fsmNotifQueue[NUM_TASK]; // fsm task -> other task, created in each task
-extern QueueHandle_t g_fsmEventQueue;    // other -> fsm task
 
 // -----------------------
 enum class RobotState {
     Idle,
     MoveToNextJunction,
     CheckHillLoyalty,
+    BallLoading,
     BallLaunching,
-    WaitLoyaltyChange,
     BackHome,
-    WaitBallReload,
-    ForceStopped,
+    WaitBucketReload,
     ManualControl,
-    Error
+    Error,
+    // Parent States
+    GameActive,
+    GameInactive,
+    Navigation,
+    HillInteraction,
+    //
+    Unknown
 };
 
 enum class RobotTeam {
@@ -56,9 +41,7 @@ enum class BeaconState {
     Beacon1k5
 };
 
-bool isGameStartedState(RobotState s);
-bool isRobotMoving(RobotState s);
-const char* stateToString(RobotState s);
+bool isOwnBeacon(RobotTeam team, BeaconState beacon);
 bool stringToState(const char* str, RobotState& out);
 const char* teamToString(RobotTeam t);
 const char* beaconStateToString(BeaconState s);
@@ -72,18 +55,14 @@ enum class FsmEventType {
     BallLoaded,
     BallLaunched,
     BucketEmptyDetected,
-    BallReloadTimeout,
+    BucketReloadTimeout,
     IrBeaconChangeDetected, // automatically send
     IrBeaconQueryResponse,  // response to query 
     // === Special event below ===
     UserStateChangeReq
 };
 
-// struct LineDetectedData {
-//     uint16_t position;
-//     uint16_t left;
-//     uint16_t right;
-// };
+const char* eventToString(FsmEventType e);
 
 struct FsmEventQueueItem {
     FsmEventType type;
@@ -95,29 +74,10 @@ struct FsmEventQueueItem {
         bool ballLaunched;
         RobotState newState;
         BeaconState newBeaconState;
-        // LineDetectedData lineDetected;
     } data;
 };
 
 // -------------------------------------
-
-/* ---------- (State/Team changed) Notif sent from FSM task to worker tasks ------------- */
-enum class FsmNotifType {
-  StateChanged,
-  TeamChanged,
-  BeaconChanged
-};
-
-struct FsmNotifData {
-  RobotState state;
-  RobotTeam team;
-  BeaconState beacon;
-};
-
-// struct FsmNotifQueueItem {
-//     FsmNotifType type;
-//     FsmNotifData data;
-// };
 
 void initQueues();
 
