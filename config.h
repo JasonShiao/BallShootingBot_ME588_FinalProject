@@ -21,6 +21,10 @@
 #define MANUAL_CALIBRATE_LINE_FOLLOWER 1
 #define LINE_FOLLOWER_POLLING_PERIOD_MS 5 // 5 ms for actual run // 200ms for demo and testing only
 
+// Mock beacon state for test
+//#define MOCK_BEACON_750 1
+//#define MOCK_BEACON_1k5 1
+
 //#define FULLY_AUTONOMOUS 1
 
 #if DEBUG_LEVEL >= 1

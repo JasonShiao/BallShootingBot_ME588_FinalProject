@@ -107,7 +107,13 @@ void irBeaconDetectTask(void *parameter) {
                 vTaskDelay(pdMS_TO_TICKS(IR_BEACON_DETECT_PERIOD_MS*3));
                 FsmEventQueueItem ev{};
                 ev.type = FsmEventType::IrBeaconQueryResponse;
+#if defined(MOCK_BEACON_750) && MOCK_BEACON_750
+                ev.data.newBeaconState = BeaconState::Beacon750;
+#elif defined(MOCK_BEACON_1k5) && MOCK_BEACON_1k5
+                ev.data.newBeaconState = BeaconState::Beacon1k5;
+#else
                 ev.data.newBeaconState = beaconState;
+#endif
                 sendFsmEventItem(ev);
             }
             
