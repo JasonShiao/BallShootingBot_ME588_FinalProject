@@ -199,7 +199,7 @@ EventResult CheckHillLoyaltyState::handle(RobotFSM& fsm, const FsmEventQueueItem
                 RobotState nextState =
                     isOwnBeacon(fsm.getTeam(), newBeacon)
                         ? RobotState::MoveToNextJunction
-                        : RobotState::BallLaunching;
+                        : RobotState::BallLoading;
                 // Reach retry limit -> proceed to next anyway
                 if (!isOwnBeacon(fsm.getTeam(), newBeacon) && 
                     fsm.incAndGetTryCnt() >= 4) {
