@@ -169,6 +169,73 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     .empty-cell {
       visibility: hidden;
     }
+
+    .route-map {
+      position: relative;
+      height: 190px;
+      margin-top: 20px;
+    }
+
+    .segment {
+      position: absolute;
+      top: 82px;
+      height: 8px;
+      background: #2d6cdf;
+      border-radius: 999px;
+    }
+
+    .transition-circle {
+      position: absolute;
+      top: 68px;
+      width: 32px;
+      height: 32px;
+      border: 4px solid #0a6;
+      background: white;
+      border-radius: 50%;
+      transform: translateX(-50%);
+      z-index: 2;
+    }
+
+    .transition-circle.inactive {
+      border-color: #aaa;
+      background: #eee;
+    }
+
+    .robot-marker {
+      position: absolute;
+      top: 62px;
+      left: 4%;
+      font-size: 42px;
+      color: #d62828;
+      transform: translateX(-50%);
+      transition: left 0.35s ease, transform 0.25s ease;
+      z-index: 5;
+    }
+
+    .route-label {
+      position: absolute;
+      top: 110px;
+      width: 130px;
+      transform: translateX(-50%);
+      text-align: center;
+      font-size: 0.85rem;
+      font-weight: bold;
+    }
+
+    .graph-status {
+      margin-top: 8px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: #eefaf3;
+      color: #0a6;
+      font-weight: bold;
+    }
+
+    .graph-status.inactive {
+      background: #f2f2f2;
+      color: #777;
+    }
+
   </style>
 </head>
 <body>
@@ -195,6 +262,50 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
         <div>Heading</div>
         <div class="state-box" id="headingState">Unknown</div>
       </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Realtime Status Graph</h2>
+
+    <div class="route-map">
+
+      <div class="transition-circle" id="circle0" style="left: 2%;"></div>
+      <!-- Segment 1 -->
+      <div class="segment active" style="left: 4%; width: 12%;"></div>
+      <div class="transition-circle" id="circle1" style="left: 18%;"></div>
+
+      <!-- Segment 2 -->
+      <div class="segment active" style="left: 20%; width: 12%;"></div>
+      <div class="transition-circle" id="circle2" style="left: 34%;"></div>
+
+      <!-- Segment 3 -->
+      <div class="segment active" style="left: 36%; width: 12%;"></div>
+      <div class="transition-circle" id="circle3" style="left: 50%;"></div>
+
+      <!-- Segment 4 -->
+      <div class="segment active" style="left: 52%; width: 12%;"></div>
+      <div class="transition-circle" id="circle4" style="left: 66%;"></div>
+
+      <!-- Segment 5 -->
+      <div class="segment active" style="left: 68%; width: 12%;"></div>
+      <div class="transition-circle" id="circle5" style="left: 82%;"></div>
+
+      <!-- Segment 6 -->
+      <div class="segment active" style="left: 84%; width: 12%;"></div>
+
+      <div id="robotMarker" class="robot-marker">➤</div>
+
+      <div class="route-label" style="left: 10%;">1<br>Home</div>
+      <div class="route-label" style="left: 26%;">2<br>HomeToJunction1</div>
+      <div class="route-label" style="left: 42%;">3<br>Junction1ToJunction2</div>
+      <div class="route-label" style="left: 58%;">4<br>Junction2ToJunction3</div>
+      <div class="route-label" style="left: 74%;">5<br>Junction3ToJunction4</div>
+      <div class="route-label" style="left: 90%;">6<br>Junction4ToRoadEnd</div>
+    </div>
+
+    <div id="graphStatus" class="graph-status">
+      Transition circles active
     </div>
   </div>
 
@@ -269,6 +380,17 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     const stopBtn = document.getElementById("stopBtn");
     const stateSelect = document.getElementById("stateSelect");
     const statusMsg = document.getElementById("statusMsg");
+
+    const robotMarkerEl = document.getElementById("robotMarker");
+    const graphStatusEl = document.getElementById("graphStatus");
+    const transitionCircles = [
+      document.getElementById("circle0"),
+      document.getElementById("circle1"),
+      document.getElementById("circle2"),
+      document.getElementById("circle3"),
+      document.getElementById("circle4"),
+      document.getElementById("circle5")
+    ];
 
     const btnForward = document.getElementById("btnForward");
     const btnForwardRight = document.getElementById("btnForwardRight");
@@ -349,6 +471,133 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
       }
     }
 
+    const locationPositionMap = {
+      Home: 10,
+      HomeBorderCrossed1: 10,
+      HomeBorderCrossed2: 10,
+
+      HomeToJunction1: 26,
+      Junction1ToJunction2: 42,
+      Junction2ToJunction3: 58,
+      Junction3ToJunction4: 74,
+      Junction4ToRoadEnd: 90
+    };
+
+    function getActiveCircleIndex(location, heading) {
+      const movingForward = heading === "Forward";
+      const movingBackward = heading === "Backward";
+
+      if (!movingForward && !movingBackward) {
+        return -1;
+      }
+
+      if (movingForward) {
+        switch (location) {
+          case "Home":
+            return 0;
+          case "HomeBorderCrossed1":
+          case "HomeBorderCrossed2":
+          case "HomeToJunction1":
+            return 1; // circle1
+          case "Junction1ToJunction2":
+            return 2; // circle2
+          case "Junction2ToJunction3":
+            return 3; // circle3
+          case "Junction3ToJunction4":
+            return 4; // circle4
+          case "Junction4ToRoadEnd":
+            return 5; // circle5
+          default:
+            return -1;
+        }
+      }
+
+      if (movingBackward) {
+        switch (location) {
+          case "Home":
+            return 0; // circle0
+          case "HomeBorderCrossed1":
+          case "HomeBorderCrossed2":
+            return 1; // circle1
+          case "HomeToJunction1":
+            return 2; // circle2
+          case "Junction1ToJunction2":
+            return 3; // circle3
+          case "Junction2ToJunction3":
+            return 4; // circle4
+          case "Junction3ToJunction4":
+          case "Junction4ToRoadEnd":
+            return 5; // circle5
+          default:
+            return -1;
+        }
+      }
+
+      return -1;
+    }
+
+    function updateTransitionCircles(location, heading) {
+      const enabled = shouldEnableTransitionCircles(currentStateEl.textContent);
+      const activeIndex = enabled ? getActiveCircleIndex(location, heading) : -1;
+
+      for (let i = 0; i < transitionCircles.length; i++) {
+        transitionCircles[i].classList.toggle("inactive", i !== activeIndex);
+      }
+
+      if (enabled && activeIndex >= 0) {
+        robotMarkerEl.style.display = "block";
+        robotMarkerEl.style.left = transitionCircles[activeIndex].style.left;
+      } else if (enabled) {
+        robotMarkerEl.style.display = "none";
+      } else {
+        robotMarkerEl.style.display = "block";
+      }
+
+      graphStatusEl.classList.toggle("inactive", !enabled);
+      graphStatusEl.textContent = enabled
+        ? "Junction active"
+        : "Robot moving";
+    }
+
+    function updateRobotGraph(location, heading) {
+      const enabled = shouldEnableTransitionCircles(currentStateEl.textContent);
+
+      if (!enabled) {
+        const pos = locationPositionMap[location];
+
+        if (pos !== undefined) {
+          robotMarkerEl.style.left = pos + "%";
+        }
+      }
+
+      const deg = headingToRotationDeg(heading);
+      robotMarkerEl.style.transform = `translateX(-50%) rotate(${deg}deg)`;
+
+      updateTransitionCircles(location, heading);
+    }
+
+    function headingToRotationDeg(heading) {
+      switch (heading) {
+        case "Forward":
+          return 0;
+        case "Backward":
+          return 180;
+        case "Left":
+        case "RotateCCW":
+          return -90;
+        case "Right":
+        case "RotateCW":
+          return 90;
+        default:
+          return 0;
+      }
+    }
+
+    function shouldEnableTransitionCircles(state) {
+      return state !== "BackHome" &&
+            state !== "MoveToNextJunction";
+    }
+
     async function loadInitialState() {
       try {
         const res = await fetch("/state");
@@ -360,6 +609,8 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
         locationStateEl.textContent = data.currentLocationState;
         headingStateEl.textContent = data.currentHeadingState;
         logEl.innerHTML = "";
+
+        updateRobotGraph(data.currentLocationState, data.currentHeadingState);
 
         for (const entry of data.log) {
           addLogEntry(entry);
@@ -438,6 +689,7 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     evtSource.addEventListener("state", (event) => {
       currentStateEl.textContent = event.data;
       updateMotionWidgets();
+      updateRobotGraph(locationStateEl.textContent, headingStateEl.textContent);
     });
 
     evtSource.addEventListener("team", (event) => {
@@ -450,10 +702,12 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
 
     evtSource.addEventListener("location", (event) => {
       locationStateEl.textContent = event.data;
+      updateRobotGraph(locationStateEl.textContent, headingStateEl.textContent);
     });
 
     evtSource.addEventListener("heading", (event) => {
       headingStateEl.textContent = event.data;
+      updateRobotGraph(locationStateEl.textContent, headingStateEl.textContent);
     });
 
     evtSource.addEventListener("log", (event) => {
