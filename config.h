@@ -13,7 +13,7 @@
 #define WIFI_PSWD "xxxxxxxxxx"
 #endif
 // Servo config
-#define SERVO_MAX_ANGLE 180 // 270
+#define SERVO_MAX_ANGLE 270 // 270
 // IR beacon detector config
 #define IR_BEACON_DETECT_PERIOD_MS 80 // 80ms -> 750Hz ~ 60 pulses; 1500Hz ~ 120 pulses // 60ms -> 750Hz ~ 45 pulses; 1500Hz ~ 90 pulses
 #define IR_BEACON_FREQ_PERIODIC_REPORT_PERIOD 1000 // 1 per second
