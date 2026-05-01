@@ -38,8 +38,8 @@ enum class RobotTeam {
 
 enum class BeaconState {
     Unknown,
-    Beacon750,
-    Beacon1k5
+    Beacon750, // Team Blue's beacon
+    Beacon1k5  // Team Red's beacon
 };
 
 enum class RobotLocation {

@@ -38,7 +38,11 @@ void ARDUINO_ISR_ATTR onIrBeaconDetectTimeoutInterrupt() {
     if (newState != beaconState) {
         ev.type = FsmEventType::IrBeaconChangeDetected;
         ev.data.newBeaconState = newState;
+#if OPEN_LOOP_CONTROL == 1
+        // Not sending the beacon update
+#else
         sendFsmEventItemFromISR(ev, xHigherPriorityTaskWoken);
+#endif
     }
     beaconState = newState;
 

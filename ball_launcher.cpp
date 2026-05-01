@@ -22,7 +22,11 @@ static const uint32_t BALL_LAUNCH_DURATION_MS = 3000; // 3s
 static const uint32_t BUCKET_RELOAD_LED_FLASH_PERIOD_MS = 500; // 0.5s
 static const uint32_t BUCKET_RELOAD_TIMER_CNT_MAX = 8;  // 8*0.5s=4s
 static const uint32_t BALL_LOADING_TOP_POS = 53;
+#if OPEN_LOOP_CONTROL == 1
+static const uint32_t BALL_SHOOT_PULLOFF_POS = 180;
+#else
 static const uint32_t BALL_SHOOT_PULLOFF_POS = 120;
+#endif
 static const uint32_t BALL_SHOOT_RELEASE_POS = 0;
 static uint32_t timeout_cnt = 0;
 BallShootingStage shooting_stage = BallShootingStage::SlingshotReleased;
@@ -44,6 +48,13 @@ void onBallLaunchTimeoutCallback(TimerHandle_t xTimer) {
     BaseType_t ok;
     switch (currCmdType) {
         case BallLauncherCtrlCmdType::Loadball:
+#if OPEN_LOOP_CONTROL == 1
+            digitalWrite(SHOOTING_LED_PIN, LOW);
+            ev.type = FsmEventType::BallLoaded;
+            ev.data.ballLoaded = true;
+            ok = sendFsmEventItem(ev);
+            DEBUG_LEVEL_1("Ball loaded.");
+#else
             if (digitalRead(BALL_BUCKET_SENSOR_PIN) == LOW) {
                 // ball loaded successfully
                 digitalWrite(SHOOTING_LED_PIN, LOW);
@@ -62,6 +73,7 @@ void onBallLaunchTimeoutCallback(TimerHandle_t xTimer) {
 
                 DEBUG_LEVEL_1("Bucket empty. Not launching ball.");
             }
+#endif
             break;
         case BallLauncherCtrlCmdType::Shoot:
             switch (shooting_stage) {

@@ -5,7 +5,7 @@
 
 // Wifi config
 #define SOFT_AP_MODE 0
-#if SOFT_AP_MODE
+#if SOFT_AP_MODE // Soft AP mode NOT WORKING for unknown reason
 #define WIFI_SSID "me588_team10"
 #define WIFI_PSWD "asdf1234"
 #else
@@ -24,6 +24,9 @@
 // Mock beacon state for test
 //#define MOCK_BEACON_750 1
 //#define MOCK_BEACON_1k5 1
+
+#define OPEN_LOOP_CONTROL 0 // for launching ball with hard-coded move (navigation without sensor)
+
 
 //#define FULLY_AUTONOMOUS 1
 

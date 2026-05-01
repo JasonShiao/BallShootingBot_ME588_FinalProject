@@ -37,7 +37,20 @@ void setMotorSpeed(int left, int right, bool swap_heading) {
 }
 
 static void setSingleMotor(int speed, int in1Pin, int in2Pin, int enPin) {
-    int absSpeed = (speed == 0 ? 0 : constrain(abs(speed), 10, 255));
+    int absSpeed = constrain(abs(speed), 0, 255);
+#if OPEN_LOOP_CONTROL == 1
+    // do nothing
+#else
+    // workaround for motor power issue
+    const uint32_t thresh = 210; // 205; 
+    if (speed != 0) {
+        if (absSpeed < thresh) {
+            speed = speed > 0 ? (absSpeed - thresh * 2) : (absSpeed + thresh * 2);
+            absSpeed = constrain(abs(speed), thresh, 255);
+        }
+    }
+#endif
+
     if (speed < 0) {
         digitalWrite(in1Pin, LOW);
         digitalWrite(in2Pin, HIGH);

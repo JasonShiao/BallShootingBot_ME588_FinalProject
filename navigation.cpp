@@ -24,13 +24,13 @@ volatile bool swappedHead = false; // swap the head of robot
 static constexpr int LINE_POS_CENTER = 1500;   // 4-sensor QTR readLineBlack(): 0 ~ 3000
 static constexpr int PID_ERR_HIST_LEN = 5;
 
-static float g_kp = 100/1500.0; // 0.02; // 0.017; // 0.023; // 0.08f;
-static float g_ki = 5/1500.0f;
-static float g_kd = 10/1500.0f; //0.18f;
+static float g_kp = 15/1500.0; // 0.02; // 0.017; // 0.023; // 0.08f;
+static float g_ki = 0/1500.0f;
+static float g_kd = 0/1500.0f; //0.18f;
 static float g_kr = 0.0f; // 0.005f; //0.001f;
 
-static int g_baseSpeedLeft  = 235; // 235
-static int g_baseSpeedRight = 235; // 235
+static int g_baseSpeedLeft  = 225; // 235
+static int g_baseSpeedRight = 225; // 235
 static int g_maxSpeedLeft   = 254;
 static int g_maxSpeedRight  = 254;
 
@@ -85,7 +85,9 @@ void localizationTask(void *parameter) {
     const TickType_t period = pdMS_TO_TICKS(LINE_FOLLOWER_POLLING_PERIOD_MS); 
     
     for (;;) {
-
+#if OPEN_LOOP_CONTROL == 1
+        // do nothing for localization sensing task in open loop
+#else
         linePosition = qtr.readLineBlack(sensor_values);
         filteredLinePos = (filteredLinePos * 4 + linePosition) / 5;
         
@@ -138,6 +140,7 @@ void localizationTask(void *parameter) {
         //     }
         // }
 
+#endif
         vTaskDelayUntil(&lastWakeTime, period);
     }
 }
@@ -147,6 +150,9 @@ void pidControlTask(void *parameter) {
     TickType_t lastWakeTime = xTaskGetTickCount();
     const TickType_t controlPeriod = pdMS_TO_TICKS(LINE_FOLLOWER_POLLING_PERIOD_MS); 
     NavigationCmd cmd{};
+    
+    int stage_idx = 0;
+    
 
     for (;;) {
         if (xQueueReceive(
@@ -161,12 +167,58 @@ void pidControlTask(void *parameter) {
                 //digitalWrite(....);
 
             } else {
-                // set motor speed to 0
+                // brake and set motor speed to 0
+                forceMotorBrake();
+                vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(400));
                 setMotorSpeed(0, 0, 0);
                 DEBUG_LEVEL_1("Deactivate line follower");
             }
         }
 
+#if OPEN_LOOP_CONTROL == 1
+        // Predetermined move
+        if (activateLineFollower) {
+            int delay;
+            int left_speed;
+            int right_speed;
+            if (stage_idx == 0) {
+                delay = 10;
+                left_speed = 0;
+                right_speed = 0;
+            } else if (stage_idx == 1) {
+                delay = 1500;
+                left_speed = 225;
+                right_speed = 235;
+            } else if (stage_idx == 2) {
+                delay = 1500;
+                left_speed = 225;
+                right_speed = 235;
+            } else if (stage_idx == 3) {
+                delay = 1500;
+                left_speed = 225;
+                right_speed = 235;
+            } else if (stage_idx == 4) {
+                delay = 1500;
+                left_speed = 225;
+                right_speed = 235;
+            } else {
+                delay = 1500;
+                left_speed = 225;
+                right_speed = 235;
+            }
+            setMotorSpeed(left_speed, right_speed, cmd.headingSwapped);
+            vTaskDelayUntil(&lastWakeTime, pdMS_TO_TICKS(delay));
+            forceMotorBrake();
+            FsmEventQueueItem ev{};
+            ev.type = FsmEventType::JunctionCrossed;
+            ev.data.junctionCrossed.left = true;
+            ev.data.junctionCrossed.right = true;
+            BaseType_t ok = sendFsmEventItem(ev);
+            stage_idx += 1;
+            stage_idx %= 5;
+            DEBUG_LEVEL_1("At stage %d", stage_idx);
+        }
+#else
         if (activateLineFollower) {
             // PID line follower logic here
             const int position = static_cast<int>(filteredLinePos);
@@ -189,9 +241,8 @@ void pidControlTask(void *parameter) {
             rightCmd = clampInt(rightCmd, 0, g_maxSpeedRight);
 
             setMotorSpeed(leftCmd, rightCmd, swappedHead);
-        } else {
-
         }
+#endif
         vTaskDelayUntil(&lastWakeTime, controlPeriod);
     }
 }
