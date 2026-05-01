@@ -90,6 +90,8 @@ void localizationTask(void *parameter) {
 #else
         linePosition = qtr.readLineBlack(sensor_values);
         filteredLinePos = (filteredLinePos * 4 + linePosition) / 5;
+        // TODO: second qtr sensor for backward navigation
+        // ...
         
         bool detected = false;
         FsmEventQueueItem ev{};
@@ -99,7 +101,7 @@ void localizationTask(void *parameter) {
         if (junct1) { // was high
             // test low threshold
             if (junct1_adc_val < QTR_1A_THRESHOLD_LOW_VAL) {
-                // Detect falling edge for sensor 1
+                // Detect falling edge for sensor 1 (black -> white)
                 junct1 = false;
                 detected = true;
                 ev.data.junctionCrossed.left = true;
@@ -114,7 +116,7 @@ void localizationTask(void *parameter) {
         if (junct2) { // was high
             // test low threshold
             if (junct2_adc_val < QTR_1A_THRESHOLD_LOW_VAL) {
-                // Detect falling edge for sensor 2
+                // Detect falling edge for sensor 2 (black -> white)
                 junct2 = false;
                 detected = true;
                 ev.data.junctionCrossed.right = true;
@@ -130,6 +132,12 @@ void localizationTask(void *parameter) {
         if (detected) {
             BaseType_t ok = sendFsmEventItem(ev);
         }
+        
+        // Serial.print(junct1_adc_val);
+        // Serial.print(",");
+        // Serial.println(junct2_adc_val); // this side works
+        //Serial.println(linePosition);
+
         // Serial.print(",");
         // for (uint8_t i = 0; i < LINE_FOLLOWER_LINE_COUNT; i++) {
         //     Serial.print(sensor_values[i]);
