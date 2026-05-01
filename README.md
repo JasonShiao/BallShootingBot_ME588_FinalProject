@@ -57,4 +57,5 @@ are filled with common actions for each child state which can pretty much reduce
 * opamp x2
 * caster wheel x2
 * wheel x2
+* OONO terminal block distribution module
 
