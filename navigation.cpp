@@ -24,12 +24,15 @@ volatile bool swappedHead = false; // swap the head of robot
 static constexpr int LINE_POS_CENTER = 1500;   // 4-sensor QTR readLineBlack(): 0 ~ 3000
 static constexpr int PID_ERR_HIST_LEN = 5;
 
+static float g_kp = 100/1500.0; // 0.02; // 0.017; // 0.023; // 0.08f;
+static float g_ki = 5/1500.0f;
+static float g_kd = 10/1500.0f; //0.18f;
 static float g_kr = 0.0f; // 0.005f; //0.001f;
 
-static int g_baseSpeedLeft  = 120;
-static int g_baseSpeedRight = 120;
-static int g_maxSpeedLeft   = 255;
-static int g_maxSpeedRight  = 255;
+static int g_baseSpeedLeft  = 235; // 235
+static int g_baseSpeedRight = 235; // 235
+static int g_maxSpeedLeft   = 254;
+static int g_maxSpeedRight  = 254;
 
 static int g_lastError = 0;
 static int g_errHist[PID_ERR_HIST_LEN] = {0};
@@ -179,8 +182,8 @@ void pidControlTask(void *parameter) {
 
             const float correction = g_kp * p + g_ki * i + g_kd * d;
 
-            int leftCmd  = static_cast<int>(g_baseSpeedLeft  + correction);
-            int rightCmd = static_cast<int>(g_baseSpeedRight - correction);
+            int leftCmd  = static_cast<int>(g_baseSpeedLeft  + correction + abs(correction) / 1.7 + g_kr*r);
+            int rightCmd = static_cast<int>(g_baseSpeedRight - correction + abs(correction) / 1.7 - g_kr*r);
 
             leftCmd  = clampInt(leftCmd,  0, g_maxSpeedLeft);
             rightCmd = clampInt(rightCmd, 0, g_maxSpeedRight);
