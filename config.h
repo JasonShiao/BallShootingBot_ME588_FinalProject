@@ -26,8 +26,6 @@
 //#define MOCK_BEACON_1k5 1
 
 #define OPEN_LOOP_CONTROL 0 // for launching ball with hard-coded move (navigation without sensor)
-
-
 //#define FULLY_AUTONOMOUS 1
 
 #if DEBUG_LEVEL >= 1

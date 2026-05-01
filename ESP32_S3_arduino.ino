@@ -4,13 +4,8 @@
 #include "ball_launcher.h"
 #include "ir_beacon_detect.h"
 #include "mobility.h"
-//#include "line_follower.h"
 #include "navigation.h"
-#if FLAT_FSM
-#include "fsm.h"
-#else
 #include "hfsm.h"
-#endif
 #ifndef FULLY_AUTONOMOUS
   #include "manual_control.h"
   #include "user_interface.h"

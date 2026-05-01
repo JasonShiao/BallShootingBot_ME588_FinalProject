@@ -22,6 +22,7 @@ static const uint32_t BALL_LAUNCH_DURATION_MS = 3000; // 3s
 static const uint32_t BUCKET_RELOAD_LED_FLASH_PERIOD_MS = 500; // 0.5s
 static const uint32_t BUCKET_RELOAD_TIMER_CNT_MAX = 8;  // 8*0.5s=4s
 static const uint32_t BALL_LOADING_TOP_POS = 53;
+static const uint32_t BALL_LOADING_BOTTOM_POS = 270;
 #if OPEN_LOOP_CONTROL == 1
 static const uint32_t BALL_SHOOT_PULLOFF_POS = 180;
 #else
@@ -49,6 +50,7 @@ void onBallLaunchTimeoutCallback(TimerHandle_t xTimer) {
     switch (currCmdType) {
         case BallLauncherCtrlCmdType::Loadball:
 #if OPEN_LOOP_CONTROL == 1
+            // Shoot anyways without checking whether ballis loaded
             digitalWrite(SHOOTING_LED_PIN, LOW);
             ev.type = FsmEventType::BallLoaded;
             ev.data.ballLoaded = true;
@@ -65,7 +67,7 @@ void onBallLaunchTimeoutCallback(TimerHandle_t xTimer) {
                 DEBUG_LEVEL_1("Ball loaded.");
             } else {
                 // failed to load ball, send bucket empty event to fsm
-                ballLoadServo.writeMicroseconds(servoAngleToMicroseconds(0)); 
+                ballLoadServo.writeMicroseconds(servoAngleToMicroseconds(BALL_LOADING_TOP_POS)); 
                 digitalWrite(SHOOTING_LED_PIN, LOW);
                 ev.type = FsmEventType::BucketEmptyDetected;
                 ev.data.ballLoaded = false;
@@ -76,12 +78,16 @@ void onBallLaunchTimeoutCallback(TimerHandle_t xTimer) {
 #endif
             break;
         case BallLauncherCtrlCmdType::Shoot:
+            // stage: pullback 
+            //        -> loader to top pos (load into slingshot) 
+            //        -> release (launch) 
+            //        -> notify fsm of launch finish
             switch (shooting_stage) {
                 case BallShootingStage::PullbackSlingshot:
                     shooting_stage = BallShootingStage::LoadBallIntoSlingshot;
                     ballLoadServo.writeMicroseconds(servoAngleToMicroseconds(BALL_LOADING_TOP_POS));
                     // TODO: Add a check for ball getting into shooter (optional)
-                    // set and start timer (one-shot)
+                    // start timer for slingshot loading
                     xTimerChangePeriod(ballLauncherTimerHandle, 
                         pdMS_TO_TICKS(800), 0);
                     xTimerStart(ballLauncherTimerHandle, 0);
@@ -90,6 +96,7 @@ void onBallLaunchTimeoutCallback(TimerHandle_t xTimer) {
                 case BallShootingStage::LoadBallIntoSlingshot:
                     shooting_stage = BallShootingStage::SlingshotReleased;
                     ballShootServo.writeMicroseconds(servoAngleToMicroseconds(BALL_SHOOT_RELEASE_POS));
+                    // start timer for launch
                     xTimerChangePeriod(ballLauncherTimerHandle, 
                         pdMS_TO_TICKS(800), 0);
                     xTimerStart(ballLauncherTimerHandle, 0);
@@ -97,6 +104,7 @@ void onBallLaunchTimeoutCallback(TimerHandle_t xTimer) {
                     break;
                 case BallShootingStage::SlingshotReleased:
                     shooting_stage = BallShootingStage::LoadBallIntoSlingshot;
+                    // Notify fsm about the finish of ball launch procedure 
                     ev.type = FsmEventType::BallLaunched;
                     ev.data.ballLaunched = true;
                     ok = sendFsmEventItem(ev);
@@ -107,6 +115,7 @@ void onBallLaunchTimeoutCallback(TimerHandle_t xTimer) {
             }
             break;
         case BallLauncherCtrlCmdType::StartBucketReload:
+            // count down for bucket reloading at home, 
             if (timeout_cnt >= BUCKET_RELOAD_TIMER_CNT_MAX) {
                 ev.type = FsmEventType::BucketReloadTimeout;
                 ev.data.bucketReloaded = true;
@@ -162,15 +171,6 @@ void initBallLauncherTask() {
 
 }
 
-/**
- * Ball launcher procedure:
- *      Load cmd: detect whether ball is already loaded first,
- *                if not loaded, start loading (turn on white LED, move servo to load position)
- *                if loaded, do nothing send event to fsm to notify ball loaded
- *                if failed, send bucket empty event to fsm
- *     Shoot cmd: if ball is loaded, start shooting procedure (move servo to shoot position
- *     Stop cmd: stop any ongoing ball launching procedure
- */
 void ballLauncherTask(void *parameter) {
     BallLauncherCtrlCmd cmd;
 
@@ -188,16 +188,16 @@ void ballLauncherTask(void *parameter) {
                     digitalWrite(SHOOTING_LED_PIN, HIGH);
                     // 1. load ball at low position (start loading procedure timer?)
                     DEBUG_LEVEL_1("Loading ball...");
-                    ballShootServo.writeMicroseconds(servoAngleToMicroseconds(BALL_SHOOT_PULLOFF_POS));
-                    ballLoadServo.writeMicroseconds(servoAngleToMicroseconds(270)); // bottom to load from hopper
+                    // shake a little to prevent ball from getting stuck
+                    ballLoadServo.writeMicroseconds(servoAngleToMicroseconds(BALL_LOADING_BOTTOM_POS)); // bottom to load from hopper
                     vTaskDelay(pdMS_TO_TICKS(500));
-                    ballLoadServo.writeMicroseconds(servoAngleToMicroseconds(260)); // bottom to load from hopper
+                    ballLoadServo.writeMicroseconds(servoAngleToMicroseconds(BALL_LOADING_BOTTOM_POS - 10)); // bottom to load from hopper
                     vTaskDelay(pdMS_TO_TICKS(500));
-                    ballLoadServo.writeMicroseconds(servoAngleToMicroseconds(270)); // bottom to load from hopper
+                    ballLoadServo.writeMicroseconds(servoAngleToMicroseconds(BALL_LOADING_BOTTOM_POS)); // bottom to load from hopper
                     vTaskDelay(pdMS_TO_TICKS(500));
-                    ballLoadServo.writeMicroseconds(servoAngleToMicroseconds(260)); // bottom to load from hopper
+                    ballLoadServo.writeMicroseconds(servoAngleToMicroseconds(BALL_LOADING_BOTTOM_POS - 10)); // bottom to load from hopper
                     vTaskDelay(pdMS_TO_TICKS(500));
-                    ballLoadServo.writeMicroseconds(servoAngleToMicroseconds(270)); // bottom to load from hopper
+                    ballLoadServo.writeMicroseconds(servoAngleToMicroseconds(BALL_LOADING_BOTTOM_POS)); // bottom to load from hopper
                     // Timer for triggering next stage
                     vTimerSetReloadMode(ballLauncherTimerHandle, pdFALSE);
                     xTimerChangePeriod(ballLauncherTimerHandle,
@@ -225,7 +225,7 @@ void ballLauncherTask(void *parameter) {
                     xTimerStop(ballLauncherTimerHandle, 0);
                     timeout_cnt = 0;
                     ballLoadServo.writeMicroseconds(servoAngleToMicroseconds(BALL_LOADING_TOP_POS));
-                    ballShootServo.writeMicroseconds(servoAngleToMicroseconds(0));
+                    ballShootServo.writeMicroseconds(servoAngleToMicroseconds(BALL_SHOOT_RELEASE_POS));
 
                     DEBUG_LEVEL_1("Ball load/launch stopped.");
                     break;

@@ -5,7 +5,7 @@
 #include "globals.h"
 #include "mobility.h"
 
-// TODO: Manually set with previous calibrate data
+// Manually set with previous calibrate data
 const uint16_t calMin[LINE_FOLLOWER_LINE_COUNT] = {70, 70, 70, 70};
 const uint16_t calMax[LINE_FOLLOWER_LINE_COUNT] = {2500, 2500, 2500, 2500};
 

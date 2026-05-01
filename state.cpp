@@ -1,9 +1,5 @@
 #include "state.h"
-#if FLAT_FSM
-#include "fsm.h"
-#else
 #include "hfsm.h"
-#endif
 
 #include "game_status.h"
 #include "team_status.h"

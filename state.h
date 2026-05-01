@@ -76,10 +76,8 @@ class NavigationState : public GameActiveState {
         return EventResult::unhandled();
     }
     void onEnter(RobotFSM& fsm, const FsmEventQueueItem* ev) const override {
-        // TODO:
     }
     void onExit(RobotFSM& fsm, const FsmEventQueueItem* ev) const override {
-        // TODO:
     }
 };
 
@@ -132,7 +130,6 @@ class ErrorState : public GameInactiveState {
   public:
     RobotState id() const override { return RobotState::Error; }
 
-    // TODO:
     //EventResult handle(RobotFSM& fsm, const FsmEventQueueItem& ev) const override;
     void onEnter(RobotFSM& fsm, const FsmEventQueueItem* ev) const override {
         DEBUG_LEVEL_1("Entered Error state");

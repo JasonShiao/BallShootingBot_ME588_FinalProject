@@ -136,8 +136,8 @@ void setupPCNT() {
   pcnt_config.unit = IR_BEACON_PCNT_UNIT;
 
   // Count only rising = num of pulses
-  pcnt_config.pos_mode = PCNT_COUNT_INC;  // rising edge
-  pcnt_config.neg_mode = PCNT_COUNT_DIS;  // falling edge
+  pcnt_config.pos_mode = PCNT_COUNT_INC;  // rising edge (INCrement the counter)
+  pcnt_config.neg_mode = PCNT_COUNT_DIS;  // falling edge ignored (DISabled)
 
   pcnt_config.lctrl_mode = PCNT_MODE_KEEP;
   pcnt_config.hctrl_mode = PCNT_MODE_KEEP;
