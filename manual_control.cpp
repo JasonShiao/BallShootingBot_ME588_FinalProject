@@ -60,30 +60,40 @@ void manualControlTask(void *parameter) {
                     // ignore
                     continue;
                 }
+                int speed = cmd.data.motion.speed;
+                int diff_speed = 25;
                 switch (cmd.data.motion.dir) {
                     case MotionDir::Forward:
-                        setMotorSpeed(230, 230, false);
+                        setMotorSpeed(speed, speed, false);
+                        //setMotorSpeed(230, 230, false);
                         break;
                     case MotionDir::ForwardLeft:
-                        setMotorSpeed(180, 230, false);
+                        setMotorSpeed(speed-diff_speed, speed+diff_speed, false);
+                        //setMotorSpeed(180, 230, false);
                         break;
                     case MotionDir::ForwardRight:
-                        setMotorSpeed(230, 180, false);
+                        setMotorSpeed(speed+diff_speed, speed-diff_speed, false);
+                        //setMotorSpeed(230, 180, false);
                         break;
                     case MotionDir::Backward:
-                        setMotorSpeed(-230, -230, false);
+                        setMotorSpeed(-speed, -speed, false);
+                        //setMotorSpeed(-230, -230, false);
                         break;
                     case MotionDir::BackwardLeft:
-                        setMotorSpeed(-180, -230, false);
+                        setMotorSpeed(-speed+diff_speed, -speed-diff_speed, false);
+                        //setMotorSpeed(-180, -230, false);
                         break;
                     case MotionDir::BackwardRight:
-                        setMotorSpeed(-230, -180, false);
+                        setMotorSpeed(-speed-diff_speed, -speed+diff_speed, false);
+                        //setMotorSpeed(-230, -180, false);
                         break;
                     case MotionDir::RotateCW:
-                        setMotorSpeed(150, -150, false);
+                        setMotorSpeed(speed, -speed, false);
+                        //setMotorSpeed(200, -200, false);
                         break;
                     case MotionDir::RotateCCW:
-                        setMotorSpeed(-150, 150, false);
+                        setMotorSpeed(-speed, speed, false);
+                        //setMotorSpeed(-200, 200, false);
                         break;
                     default:
                         break;

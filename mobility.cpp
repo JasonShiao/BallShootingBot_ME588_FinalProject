@@ -1,7 +1,7 @@
 #include "mobility.h"
 #include <Arduino.h>
 
-#define MOTOR_PWM_FREQ 10000    // 10kHz
+#define MOTOR_PWM_FREQ 5000    // 10kHz
 #define MOTOR_PWM_RESOLUTION 8  // 0–255
 #define MOTOR_PWM_MAX ((1 << MOTOR_PWM_RESOLUTION) - 1)
 
@@ -37,7 +37,7 @@ void setMotorSpeed(int left, int right, bool swap_heading) {
 }
 
 static void setSingleMotor(int speed, int in1Pin, int in2Pin, int enPin) {
-    int absSpeed = constrain(abs(speed), 0, 255);
+    int absSpeed = (speed == 0 ? 0 : constrain(abs(speed), 10, 255));
     if (speed < 0) {
         digitalWrite(in1Pin, LOW);
         digitalWrite(in2Pin, HIGH);

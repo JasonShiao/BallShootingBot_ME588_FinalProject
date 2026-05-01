@@ -6,23 +6,25 @@
 #include "mobility.h"
 
 // TODO: Manually set with previous calibrate data
-const uint16_t calMin[LINE_FOLLOWER_LINE_COUNT] = {123, 110, 118, 130};
-const uint16_t calMax[LINE_FOLLOWER_LINE_COUNT] = {820, 790, 845, 810};
+const uint16_t calMin[LINE_FOLLOWER_LINE_COUNT] = {70, 70, 70, 70};
+const uint16_t calMax[LINE_FOLLOWER_LINE_COUNT] = {2500, 2500, 2500, 2500};
 
 QTRSensors qtr;
 static uint16_t sensor_values[LINE_FOLLOWER_LINE_COUNT];
 void initLineFollower();
 //void initJunctionDetect();
-//#define QTR_1A_THRESHOLD_VAL 500
+#define QTR_1A_THRESHOLD_HIGH_VAL 3700 // 12-bit: 0-4095 -> black
+#define QTR_1A_THRESHOLD_LOW_VAL  2800 // 12-bit: 0-4095 -> white
+bool junct1 = false; // low (white) at init location
+bool junct2 = false; // low (white) at init location
+
 volatile bool swappedHead = false; // swap the head of robot
 
 // ======== PID control ========
 static constexpr int LINE_POS_CENTER = 1500;   // 4-sensor QTR readLineBlack(): 0 ~ 3000
 static constexpr int PID_ERR_HIST_LEN = 5;
 
-static float g_kp = 0.08f;
-static float g_ki = 0.0f;
-static float g_kd = 0.18f;
+static float g_kr = 0.0f; // 0.005f; //0.001f;
 
 static int g_baseSpeedLeft  = 120;
 static int g_baseSpeedRight = 120;
@@ -67,7 +69,7 @@ static int clampInt(int x, int lo, int hi) {
 
 // ========= Shared localization values ========= 
 volatile static uint16_t linePosition = 0;
-volatile static uint16_t filteredLinePos = 0;
+volatile static uint16_t filteredLinePos = 1500;
 
 // ========= freeRTOS variables =========
 TaskHandle_t localizationTaskHandle = nullptr;
@@ -79,56 +81,50 @@ void localizationTask(void *parameter) {
     TickType_t lastWakeTime = xTaskGetTickCount();
     const TickType_t period = pdMS_TO_TICKS(LINE_FOLLOWER_POLLING_PERIOD_MS); 
     
-    //FsmNotifQueueItem notif_item;
-
     for (;;) {
-        // receive notification (non blocking)
-        // if (xQueueReceive(
-        //         g_fsmNotifQueue[toIndex(TaskId::Localization)], 
-        //         &notif_item, 0) == pdPASS) {
-            
-        //     DEBUG_LEVEL_2("notif from fsm rcvd by Localization");
-
-        //     switch (notif_item.type) {
-        //         case FsmNotifType::StateChanged:
-        //             currState = notif_item.data.state;
-        //             if (!isGameStartedState(currState)) {
-        //                 junctionDetect1 = false;
-        //                 junctionDetect2 = false;
-        //             }
-        //             break;
-        //         default:
-        //             break;
-        //     }
-
-        // }
 
         linePosition = qtr.readLineBlack(sensor_values);
         filteredLinePos = (filteredLinePos * 4 + linePosition) / 5;
         
-        // if (isRobotMoving(currState)) {
-        //     bool newJunctionDetect1 = analogRead(JUNCTION_DETECTOR_PIN_1) > QTR_1A_THRESHOLD_VAL;
-        //     bool newJunctionDetect2 = analogRead(JUNCTION_DETECTOR_PIN_2) > QTR_1A_THRESHOLD_VAL;
-        //     // Detect falling edge for sensor 1
-        //     bool detected = false;
-        //     FsmEventQueueItem ev{};
-        //     ev.type = FsmEventType::JuncionDetected;
-        //     if (junctionDetect1 && !newJunctionDetect1) {
-        //         detected = true;
-        //         ev.data.junctionState.sensor[0] = true;
-        //     }
-        //     junctionDetect1 = newJunctionDetect1;
-        //     // Detect falling edge for sensor 2
-        //     if (junctionDetect2 && !newJunctionDetect2) {
-        //         detected = true;
-        //         ev.data.junctionState.sensor[1] = true;
-        //     }
-        //     junctionDetect2 = newJunctionDetect2;
-        //     if (detected) {
-        //         BaseType_t ok = xQueueSend(g_fsmEventQueue, &ev, 0);
-        //     }
-        // }
-        // Serial.print(linePosition);
+        bool detected = false;
+        FsmEventQueueItem ev{};
+        ev.type = FsmEventType::JunctionCrossed;
+        int junct1_adc_val = analogRead(JUNCTION_DETECTOR_PIN_1);
+        int junct2_adc_val = analogRead(JUNCTION_DETECTOR_PIN_2);
+        if (junct1) { // was high
+            // test low threshold
+            if (junct1_adc_val < QTR_1A_THRESHOLD_LOW_VAL) {
+                // Detect falling edge for sensor 1
+                junct1 = false;
+                detected = true;
+                ev.data.junctionCrossed.left = true;
+                DEBUG_LEVEL_2("Junct1 Back to white");
+            }
+        } else {
+            if (junct1_adc_val > QTR_1A_THRESHOLD_HIGH_VAL) {
+                junct1 = true;
+                DEBUG_LEVEL_2("Junct1 Enter to black");
+            }
+        }
+        if (junct2) { // was high
+            // test low threshold
+            if (junct2_adc_val < QTR_1A_THRESHOLD_LOW_VAL) {
+                // Detect falling edge for sensor 2
+                junct2 = false;
+                detected = true;
+                ev.data.junctionCrossed.right = true;
+                DEBUG_LEVEL_2("Junct2 Back to white");
+            }
+        } else {
+            if (junct2_adc_val > QTR_1A_THRESHOLD_HIGH_VAL) {
+                junct2 = true;
+                DEBUG_LEVEL_2("Junct2 Enter to black");
+            }
+        }
+
+        if (detected) {
+            BaseType_t ok = sendFsmEventItem(ev);
+        }
         // Serial.print(",");
         // for (uint8_t i = 0; i < LINE_FOLLOWER_LINE_COUNT; i++) {
         //     Serial.print(sensor_values[i]);
@@ -178,6 +174,7 @@ void pidControlTask(void *parameter) {
             const int p = error;
             const int i = sumPidErrors(5, false);
             const int d = error - g_lastError;
+            const int r = sumPidErrors(5, true);
             g_lastError = error;
 
             const float correction = g_kp * p + g_ki * i + g_kd * d;

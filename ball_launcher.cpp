@@ -5,6 +5,13 @@
 #include "queue.h"
 #include "globals.h"
 
+enum class BallShootingStage {
+    PullbackSlingshot,     //
+    LoadBallIntoSlingshot, // ball loader from bottom to top
+    SlingshotReleased
+};
+
+
 void ballLauncherTask(void *parameter);
 static TaskHandle_t ballLauncherTaskHandle = nullptr;
 static TimerHandle_t ballLauncherTimerHandle = nullptr;
@@ -14,7 +21,11 @@ static volatile BallLauncherCtrlCmdType currCmdType = BallLauncherCtrlCmdType::S
 static const uint32_t BALL_LAUNCH_DURATION_MS = 3000; // 3s
 static const uint32_t BUCKET_RELOAD_LED_FLASH_PERIOD_MS = 500; // 0.5s
 static const uint32_t BUCKET_RELOAD_TIMER_CNT_MAX = 8;  // 8*0.5s=4s
+static const uint32_t BALL_LOADING_TOP_POS = 53;
+static const uint32_t BALL_SHOOT_PULLOFF_POS = 120;
+static const uint32_t BALL_SHOOT_RELEASE_POS = 0;
 static uint32_t timeout_cnt = 0;
+BallShootingStage shooting_stage = BallShootingStage::SlingshotReleased;
 
 Servo ballLoadServo;
 Servo ballShootServo;
@@ -29,24 +40,72 @@ int servoAngleToMicroseconds(int angle) {
 }
 
 void onBallLaunchTimeoutCallback(TimerHandle_t xTimer) {
-    if (currCmdType == BallLauncherCtrlCmdType::Shoot) {
-        FsmEventQueueItem ev{};
-        ev.type = FsmEventType::BallLaunched;
-        ev.data.ballLaunched = true;
-        BaseType_t ok = sendFsmEventItem(ev);
-        if (ok != pdPASS) {
-            // queue full, handle error if needed
-        }
-    } else if (currCmdType == BallLauncherCtrlCmdType::StartBucketReload) {
-        if (timeout_cnt >= BUCKET_RELOAD_TIMER_CNT_MAX) {
-            FsmEventQueueItem ev{};
-            ev.type = FsmEventType::BucketReloadTimeout;
-            ev.data.bucketReloaded = true;
-            BaseType_t ok = sendFsmEventItem(ev);
-        }
-        digitalWrite(SHOOTING_LED_PIN, timeout_cnt % 2);
-        timeout_cnt += 1;
+    FsmEventQueueItem ev{};
+    BaseType_t ok;
+    switch (currCmdType) {
+        case BallLauncherCtrlCmdType::Loadball:
+            if (digitalRead(BALL_BUCKET_SENSOR_PIN) == LOW) {
+                // ball loaded successfully
+                digitalWrite(SHOOTING_LED_PIN, LOW);
+                ev.type = FsmEventType::BallLoaded;
+                ev.data.ballLoaded = true;
+                ok = sendFsmEventItem(ev);
+
+                DEBUG_LEVEL_1("Ball loaded.");
+            } else {
+                // failed to load ball, send bucket empty event to fsm
+                ballLoadServo.writeMicroseconds(servoAngleToMicroseconds(0)); 
+                digitalWrite(SHOOTING_LED_PIN, LOW);
+                ev.type = FsmEventType::BucketEmptyDetected;
+                ev.data.ballLoaded = false;
+                ok = sendFsmEventItem(ev);
+
+                DEBUG_LEVEL_1("Bucket empty. Not launching ball.");
+            }
+            break;
+        case BallLauncherCtrlCmdType::Shoot:
+            switch (shooting_stage) {
+                case BallShootingStage::PullbackSlingshot:
+                    shooting_stage = BallShootingStage::LoadBallIntoSlingshot;
+                    ballLoadServo.writeMicroseconds(servoAngleToMicroseconds(BALL_LOADING_TOP_POS));
+                    // TODO: Add a check for ball getting into shooter (optional)
+                    // set and start timer (one-shot)
+                    xTimerChangePeriod(ballLauncherTimerHandle, 
+                        pdMS_TO_TICKS(800), 0);
+                    xTimerStart(ballLauncherTimerHandle, 0);
+                    DEBUG_LEVEL_2("pulled back slingshot");
+                    break;
+                case BallShootingStage::LoadBallIntoSlingshot:
+                    shooting_stage = BallShootingStage::SlingshotReleased;
+                    ballShootServo.writeMicroseconds(servoAngleToMicroseconds(BALL_SHOOT_RELEASE_POS));
+                    xTimerChangePeriod(ballLauncherTimerHandle, 
+                        pdMS_TO_TICKS(800), 0);
+                    xTimerStart(ballLauncherTimerHandle, 0);
+                    DEBUG_LEVEL_2("loaded ball into slingshot");
+                    break;
+                case BallShootingStage::SlingshotReleased:
+                    shooting_stage = BallShootingStage::LoadBallIntoSlingshot;
+                    ev.type = FsmEventType::BallLaunched;
+                    ev.data.ballLaunched = true;
+                    ok = sendFsmEventItem(ev);
+                    DEBUG_LEVEL_2("released slingshot");
+                    break;
+                default:
+                    break;
+            }
+            break;
+        case BallLauncherCtrlCmdType::StartBucketReload:
+            if (timeout_cnt >= BUCKET_RELOAD_TIMER_CNT_MAX) {
+                ev.type = FsmEventType::BucketReloadTimeout;
+                ev.data.bucketReloaded = true;
+                ok = sendFsmEventItem(ev);
+            }
+            digitalWrite(SHOOTING_LED_PIN, timeout_cnt % 2);
+            break;
+        default:
+            break;
     }
+    timeout_cnt += 1;
 }
 
 void initBallLauncherTask() {
@@ -62,6 +121,8 @@ void initBallLauncherTask() {
     ballShootServo.setPeriodHertz(50);    // standard 50 hz servo
     ballLoadServo.attach(BALL_LOADING_SERVO_PIN, 500, 2500);
     ballShootServo.attach(BALL_SHOOTING_SERVO_PIN, 500, 2500);
+
+    ballLoadServo.writeMicroseconds(servoAngleToMicroseconds(BALL_LOADING_TOP_POS)); // 0 for top (close to shooter)
 
     ballLauncherCmdQueue = xQueueCreate(10, sizeof(BallLauncherCtrlCmd));
     if (ballLauncherCmdQueue == nullptr) {
@@ -113,72 +174,45 @@ void ballLauncherTask(void *parameter) {
                 case BallLauncherCtrlCmdType::Loadball:
                     // stop shooting procedure timer in case it's still running
                     digitalWrite(SHOOTING_LED_PIN, HIGH);
-                    // 1. Detect ball first
-                    if (digitalRead(BALL_BUCKET_SENSOR_PIN) == LOW) {
-                        // breakbeam blocked -> NPN closed -> ball detected
-                        // 2. if loaded, send event, break
-                        FsmEventQueueItem ev{};
-                        ev.type = FsmEventType::BallLoaded;
-                        ev.data.ballLoaded = true;
-                        BaseType_t ok = sendFsmEventItem(ev);
-
-                        DEBUG_LEVEL_1("Ball loaded.");
-                        break;
-                    }
-                    // 3. if not loaded, (start loading procedure timer?)
+                    // 1. load ball at low position (start loading procedure timer?)
                     DEBUG_LEVEL_1("Loading ball...");
-                    ballLoadServo.writeMicroseconds(servoAngleToMicroseconds(SERVO_MAX_ANGLE));
-                    vTaskDelay(pdMS_TO_TICKS(1000));
-                    if (digitalRead(BALL_BUCKET_SENSOR_PIN) == LOW) {
-                        // ball loaded successfully
-                        ballLoadServo.writeMicroseconds(servoAngleToMicroseconds(0));
-                        digitalWrite(SHOOTING_LED_PIN, LOW);
-                        FsmEventQueueItem ev{};
-                        ev.type = FsmEventType::BallLoaded;
-                        ev.data.ballLoaded = true;
-                        BaseType_t ok = sendFsmEventItem(ev);
-
-                        DEBUG_LEVEL_1("Ball loaded.");
-                    } else {
-                        // failed to load ball, send bucket empty event to fsm
-                        ballLoadServo.writeMicroseconds(servoAngleToMicroseconds(0)); 
-                        digitalWrite(SHOOTING_LED_PIN, LOW);
-                        FsmEventQueueItem ev{};
-                        ev.type = FsmEventType::BucketEmptyDetected;
-                        ev.data.ballLoaded = false;
-                        BaseType_t ok = sendFsmEventItem(ev);
-
-                        DEBUG_LEVEL_1("Bucket empty. Not launching ball.");
-                    }
+                    ballShootServo.writeMicroseconds(servoAngleToMicroseconds(BALL_SHOOT_PULLOFF_POS));
+                    ballLoadServo.writeMicroseconds(servoAngleToMicroseconds(270)); // bottom to load from hopper
+                    vTaskDelay(pdMS_TO_TICKS(500));
+                    ballLoadServo.writeMicroseconds(servoAngleToMicroseconds(260)); // bottom to load from hopper
+                    vTaskDelay(pdMS_TO_TICKS(500));
+                    ballLoadServo.writeMicroseconds(servoAngleToMicroseconds(270)); // bottom to load from hopper
+                    vTaskDelay(pdMS_TO_TICKS(500));
+                    ballLoadServo.writeMicroseconds(servoAngleToMicroseconds(260)); // bottom to load from hopper
+                    vTaskDelay(pdMS_TO_TICKS(500));
+                    ballLoadServo.writeMicroseconds(servoAngleToMicroseconds(270)); // bottom to load from hopper
+                    // Timer for triggering next stage
+                    vTimerSetReloadMode(ballLauncherTimerHandle, pdFALSE);
+                    xTimerChangePeriod(ballLauncherTimerHandle,
+                        pdMS_TO_TICKS(500), 0);
+                    xTimerStart(ballLauncherTimerHandle, 0);
                     break;
                 case BallLauncherCtrlCmdType::Shoot:
                     digitalWrite(SHOOTING_LED_PIN, HIGH);
                     // 1. detect ball first (optional)
                     // stop loading procedure timer in case it's still running
                     // 2. start shooting procedure timer
-                    ballShootServo.writeMicroseconds(servoAngleToMicroseconds(0));
-                    vTaskDelay(pdMS_TO_TICKS(800));
-                    ballShootServo.writeMicroseconds(servoAngleToMicroseconds(SERVO_MAX_ANGLE));
-                    vTaskDelay(pdMS_TO_TICKS(800));
-                    ballShootServo.writeMicroseconds(servoAngleToMicroseconds(0));
-                    vTaskDelay(pdMS_TO_TICKS(500));
-
-                    // set and start timer (one-shot)
-                    timeout_cnt = 0;
+                    ballShootServo.writeMicroseconds(servoAngleToMicroseconds(BALL_SHOOT_PULLOFF_POS));
+                    shooting_stage = BallShootingStage::PullbackSlingshot;
                     vTimerSetReloadMode(ballLauncherTimerHandle, pdFALSE);
                     xTimerChangePeriod(ballLauncherTimerHandle, 
-                        pdMS_TO_TICKS(BALL_LAUNCH_DURATION_MS), 0);
+                        pdMS_TO_TICKS(800), 0);
                     if (xTimerStart(ballLauncherTimerHandle, 0) != pdPASS) {
                         // error ...
                     }
-                    DEBUG_LEVEL_1("Ball should've been launched in the air. Wait for 3 sec...");
                     break;
                 case BallLauncherCtrlCmdType::Stop:
                     // stop shooting or loading procedure timer
                     digitalWrite(SHOOTING_LED_PIN, LOW);
                     // stop timer in case
                     xTimerStop(ballLauncherTimerHandle, 0);
-                    ballLoadServo.writeMicroseconds(servoAngleToMicroseconds(0));
+                    timeout_cnt = 0;
+                    ballLoadServo.writeMicroseconds(servoAngleToMicroseconds(BALL_LOADING_TOP_POS));
                     ballShootServo.writeMicroseconds(servoAngleToMicroseconds(0));
 
                     DEBUG_LEVEL_1("Ball load/launch stopped.");
