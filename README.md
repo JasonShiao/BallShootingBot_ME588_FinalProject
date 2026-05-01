@@ -49,6 +49,8 @@ are filled with common actions for each child state which can pretty much reduce
 
 ## Other Hardware
 * ESP32-S3 x1
+* 12V to 5V step down buck converter x1
+* Motor driver x1 (recommend a modern one instead of L298N)
 * 12V DC motor x2
 * 5V Servo x2 for ball loader and ball launcher
 * TEKT-5400S IR phototransistor x1
